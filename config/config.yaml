@@ -1,0 +1,50 @@
+paths:
+  processed_cvs: data/silver/cleaned_cvs.csv
+  processed_jobs: data/silver/cleaned_jobs.csv
+  tfidf_model: data/gold/models/tfidf_model.pkl
+  output_rankings: data/gold/rankings/candidate_scores.csv
+  output_explanations: data/gold/rankings/candidate_scores_explained.csv
+  ground_truth: data/evaluation/ground_truth.csv
+
+ingest:
+  raw_cvs_dir: data/bronze/cvs
+  raw_jobs_dir: data/bronze/job_descriptions
+
+preprocessing:
+  language: en
+  remove_stopwords: true
+  lemmatize: true
+
+tfidf:
+  max_features: 5000
+  ngram_range: [1, 2]
+  min_df: 1
+  max_df: 0.95
+  sublinear_tf: true
+
+embeddings:
+  enabled: true
+  model_name: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+  batch_size: 32
+
+fusion:
+  weights:
+    tfidf: 0.35
+    dense: 0.45
+    skills: 0.15
+    experience: 0.05
+
+matching:
+  top_k: 10
+
+evaluation:
+  top_k_values: [1, 3, 5]
+
+pipeline:
+  write_explanations: true
+
+experiment:
+  write_manifest: true
+
+logging:
+  level: INFO

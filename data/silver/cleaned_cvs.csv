@@ -1,0 +1,15 @@
+cv_id,text
+sample_cv_1,"Ayşe Yılmaz — Yazılım Geliştirici
+Özet: 5 yıl Python ile backend geliştirme. FastAPI ve Django ile REST API tasarımı. PostgreSQL, Redis. Docker ve CI/CD (GitHub Actions). Mikroservis deneyimi. Agile/Scrum.
+
+Deneyim:
+- ABC Teknoloji — Senior Backend Developer (2021-günümüz): Python mikroservisler, OpenAPI, unit test (pytest).
+- XYZ A.Ş. — Developer (2019-2021): SQL optimizasyonu, ETL scriptleri.
+
+Eğitim: Bilgisayar Mühendisliği Lisans
+"
+sample_cv_2,"Mehmet Kaya — Frontend Geliştirici
+React, TypeScript, Vue.js ile kullanıcı arayüzleri. Figma ile tasarım işbirliği. 4 yıl deneyim. Node.js ile basit BFF katmanı.
+
+Eğitim: Yazılım Mühendisliği
+"

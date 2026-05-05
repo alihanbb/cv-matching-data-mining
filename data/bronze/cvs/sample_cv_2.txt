@@ -1,0 +1,4 @@
+Mehmet Kaya — Frontend Geliştirici
+React, TypeScript, Vue.js ile kullanıcı arayüzleri. Figma ile tasarım işbirliği. 4 yıl deneyim. Node.js ile basit BFF katmanı.
+
+Eğitim: Yazılım Mühendisliği

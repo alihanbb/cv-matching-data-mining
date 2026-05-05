@@ -1,0 +1,50 @@
+{
+  "output_path": "data\\silver\\unified_resumes.jsonl",
+  "source_root": "C:\\Users\\ACER\\Desktop\\cv_analysis",
+  "include_pdfs": false,
+  "pdf_limit": 0,
+  "records": 9484,
+  "empty_or_error_records": 221,
+  "by_source": {
+    "train_json_ner": 5960,
+    "sample_json_ner": 5,
+    "entity_recognition_json": 220,
+    "resume_dataset_2_csv": 815,
+    "resume_corpus_csv": 2484
+  },
+  "by_status": {
+    "ok": 9263,
+    "empty_text": 221
+  },
+  "by_category": {
+    "Data Scientist": 124,
+    "HR Executive": 130,
+    "Marketing Manager": 112,
+    "Software Engineer": 342,
+    "Financial Analyst": 107,
+    "HR": 110,
+    "DESIGNER": 107,
+    "INFORMATION-TECHNOLOGY": 120,
+    "TEACHER": 102,
+    "ADVOCATE": 118,
+    "BUSINESS-DEVELOPMENT": 120,
+    "HEALTHCARE": 115,
+    "FITNESS": 117,
+    "AGRICULTURE": 63,
+    "BPO": 22,
+    "SALES": 116,
+    "CONSULTANT": 115,
+    "DIGITAL-MEDIA": 96,
+    "AUTOMOBILE": 36,
+    "CHEF": 118,
+    "FINANCE": 118,
+    "APPAREL": 97,
+    "ENGINEERING": 118,
+    "ACCOUNTANT": 118,
+    "CONSTRUCTION": 112,
+    "PUBLIC-RELATIONS": 111,
+    "BANKING": 115,
+    "ARTS": 103,
+    "AVIATION": 117
+  }
+}
