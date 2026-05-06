@@ -7,10 +7,20 @@ import pandas as pd
 
 
 def _relevance_by_job(ground_truth: pd.DataFrame) -> dict[str, set[str]]:
-    sub = ground_truth[ground_truth["relevant"].astype(int) == 1]
+    """job_id -> {cv_id} for binary metrics; any grade >= 1 is relevant."""
+    sub = ground_truth[ground_truth["relevant"].astype(int) >= 1]
     m: dict[str, set[str]] = defaultdict(set)
     for _, r in sub.iterrows():
         m[str(r["job_id"])].add(str(r["cv_id"]))
+    return dict(m)
+
+
+def _graded_by_job(ground_truth: pd.DataFrame) -> dict[str, dict[str, int]]:
+    """job_id -> {cv_id: grade}; supports graded NDCG (relevance ∈ {0..3})."""
+    sub = ground_truth[ground_truth["relevant"].astype(int) >= 1]
+    m: dict[str, dict[str, int]] = defaultdict(dict)
+    for _, r in sub.iterrows():
+        m[str(r["job_id"])][str(r["cv_id"])] = int(r["relevant"])
     return dict(m)
 
 
@@ -35,16 +45,17 @@ def _dcg(rels: list[int]) -> float:
 
 
 def ndcg_at_k(ranked: pd.DataFrame, ground_truth: pd.DataFrame, k: int) -> float:
-    rel = _relevance_by_job(ground_truth)
-    if not rel:
+    """Graded NDCG@K. Supports binary (0/1) and graded (0..3) labels."""
+    grades = _graded_by_job(ground_truth)
+    if not grades:
         return 0.0
     scores: list[float] = []
-    for job, relevant in rel.items():
+    for job, cv_grade in grades.items():
         sub = ranked[ranked["job_id"].astype(str) == job].sort_values("rank_for_job").head(k)
-        gained = [1 if str(row["cv_id"]) in relevant else 0 for _, row in sub.iterrows()]
+        gained = [int(cv_grade.get(str(row["cv_id"]), 0)) for _, row in sub.iterrows()]
         dcg = _dcg(gained)
-        ideal_len = min(len(relevant), k)
-        ideal = [1] * ideal_len + [0] * (k - ideal_len)
+        ideal_grades = sorted(cv_grade.values(), reverse=True)[:k]
+        ideal = ideal_grades + [0] * max(0, k - len(ideal_grades))
         idcg = _dcg(ideal)
         scores.append(dcg / idcg if idcg > 0 else 0.0)
     return sum(scores) / max(len(scores), 1)

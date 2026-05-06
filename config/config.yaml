@@ -28,11 +28,12 @@ embeddings:
   batch_size: 32
 
 fusion:
+  # Final score = 0.35*tfidf + 0.35*dense(semantic) + 0.20*skills + 0.10*experience
   weights:
     tfidf: 0.35
-    dense: 0.45
-    skills: 0.15
-    experience: 0.05
+    dense: 0.35
+    skills: 0.20
+    experience: 0.10
 
 matching:
   top_k: 10

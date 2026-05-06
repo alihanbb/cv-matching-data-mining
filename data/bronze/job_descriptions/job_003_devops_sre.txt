@@ -1,0 +1,22 @@
+Senior DevOps / SRE Engineer
+
+Description:
+We are looking for a senior DevOps / SRE engineer to operate our cloud-native
+platform across AWS and GCP. You will own infrastructure-as-code, CI/CD,
+observability, and incident response.
+
+Responsibilities:
+- Operate Kubernetes clusters in production.
+- Design CI/CD pipelines using GitHub Actions.
+- Build infrastructure as code with Terraform.
+- Improve observability, on-call practices, and security hardening.
+
+Requirements:
+- At least 5 years of experience in DevOps, SRE, or platform engineering.
+- Strong Linux, Docker, and Kubernetes experience.
+- Hands-on AWS or GCP cloud experience.
+- Familiarity with Git and CI/CD tooling.
+
+Nice to have:
+- Python or Bash automation experience.
+- Background in agile teams.

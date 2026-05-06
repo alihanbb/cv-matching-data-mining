@@ -6,7 +6,12 @@ import pandas as pd
 
 
 def _relevant_pairs(df: pd.DataFrame) -> set[tuple]:
-    sub = df[df["relevant"].astype(int) == 1]
+    """Return relevant (cv_id, job_id) pairs.
+
+    Treats any positive grade (>=1) as relevant; this works for both binary
+    (0/1) and graded (0..3) ground truth.
+    """
+    sub = df[df["relevant"].astype(int) >= 1]
     return set(zip(sub["cv_id"].tolist(), sub["job_id"].tolist()))
 
 

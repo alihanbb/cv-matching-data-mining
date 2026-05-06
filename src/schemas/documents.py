@@ -25,9 +25,11 @@ class GroundTruthRow(BaseModel):
 
     @field_validator("relevant")
     @classmethod
-    def _rel_binary(cls, v: int) -> int:
-        if v not in (0, 1):
-            raise ValueError("relevant must be 0 or 1")
+    def _rel_in_range(cls, v: int) -> int:
+        # Graded relevance: 0 = not relevant, 1 = weak, 2 = relevant, 3 = highly relevant.
+        # Binary labels (0/1) remain valid as a special case.
+        if v not in (0, 1, 2, 3):
+            raise ValueError("relevant must be one of {0, 1, 2, 3}")
         return v
 
 
@@ -42,6 +44,14 @@ def validate_processed_df(df: pd.DataFrame, id_col: str, text_col: str) -> pd.Da
 
 
 def validate_ground_truth_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Validate a ground-truth DataFrame.
+
+    Accepts either ``relevant`` or the user-facing ``relevance`` column name;
+    the returned DataFrame always normalizes to ``relevant``.
+    """
+    df = df.copy()
+    if "relevant" not in df.columns and "relevance" in df.columns:
+        df = df.rename(columns={"relevance": "relevant"})
     for c in ("cv_id", "job_id", "relevant"):
         if c not in df.columns:
             raise ValueError(f"Ground truth must have column {c}")

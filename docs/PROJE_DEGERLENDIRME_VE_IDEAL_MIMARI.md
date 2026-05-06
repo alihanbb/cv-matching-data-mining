@@ -96,7 +96,7 @@ Aşağıdaki katmanlar, projeyi “ders ödevi”nden “güvenilir bir sisteme�
 - **Silver**: Normalize metin, dil tespiti, PII redaksiyonu (isteğe bağlı), tutarlı şema.
 - **Gold**: Özellik vektörleri, model artifact’ları, sıralama çıktıları (versiyonlu).
 
-Bu depodaki dizin eşlemesi: `**data/bronze/`** (ham), `**data/silver/`** (CSV şema), `**data/gold/models`** ve `**data/gold/rankings`**, etiketler `**data/evaluation/**`; çalıştırma manifestleri `**artifacts/runs/**`.
+Bu depodaki dizin eşlemesi: `**data/bronze/`** (ham), `**data/silver/`** (CSV şema), `**data/gold/models`** ve `**data/gold/rankings`**, etiketler `**data/evaluation/`**; çalıştırma manifestleri `**artifacts/runs/**`.
 
 Her katman için **immutability** (üzerine yazmak yerine yeni partition) ve **lineage** (hangi ham dosyadan üretildi) izlenir.
 

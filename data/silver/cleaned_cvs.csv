@@ -1,4 +1,93 @@
 cv_id,text
+cv_001_python_backend,"Ayse Yilmaz
+Senior Backend Engineer
+
+Summary:
+6 years of experience building Python backend services with FastAPI and Django.
+Strong knowledge of PostgreSQL, Redis, and message queues (Kafka).
+Hands-on with Docker, Kubernetes, and GitHub Actions CI/CD pipelines.
+Comfortable working in agile teams; mentored junior engineers.
+
+Experience:
+- ABC Tech, Senior Backend Developer (2021-present)
+  Designed REST APIs, microservices, and asynchronous workers in Python.
+  Migrated legacy monolith to containerized microservices on Kubernetes.
+- XYZ A.S., Backend Developer (2019-2021)
+  Built ETL pipelines and SQL data services on PostgreSQL and Spark.
+
+Skills:
+Python, FastAPI, Django, REST API, PostgreSQL, Redis, Kafka, Docker,
+Kubernetes, GitHub Actions, Git, Linux, Agile, Scrum, AWS, NLP
+
+Education:
+B.Sc. Computer Engineering
+"
+cv_002_data_scientist,"Mehmet Kaya
+Data Scientist
+
+Summary:
+4 years of experience in machine learning and NLP projects.
+Built classification and ranking models with scikit-learn and PyTorch.
+Comfortable with pandas, NumPy, SQL, and Spark for large-scale data processing.
+Experience deploying models with Docker on AWS.
+
+Experience:
+- DataCo, Data Scientist (2022-present)
+  Built churn prediction and recommender models.
+  Designed evaluation pipelines with NDCG and MRR.
+- StartupX, ML Engineer (2020-2022)
+  Trained NLP models for ticket classification.
+
+Skills:
+Python, scikit-learn, PyTorch, TensorFlow, pandas, NumPy, SQL, Spark,
+Docker, AWS, NLP, Machine Learning, Deep Learning, Data Mining, Git
+
+Education:
+M.Sc. Data Science
+"
+cv_003_frontend,"Selin Aydin
+Frontend Engineer
+
+Summary:
+5 years of experience building user interfaces with React and TypeScript.
+Strong knowledge of HTML, CSS, modern build tooling, and accessibility.
+Some experience with Node.js for BFF layers and integration tests.
+
+Experience:
+- WebStudio, Senior Frontend Engineer (2021-present)
+  Designed component libraries with React and TypeScript.
+  Improved performance and accessibility across multiple products.
+- DigitalAgency, Frontend Developer (2019-2021)
+  Built marketing sites and dashboards in Vue.js and React.
+
+Skills:
+JavaScript, TypeScript, React, Node, HTML, CSS, Git, Agile, Scrum
+
+Education:
+B.Sc. Software Engineering
+"
+cv_004_devops,"Can Demir
+DevOps / SRE
+
+Summary:
+7 years of experience operating production systems on AWS and GCP.
+Built CI/CD pipelines, infrastructure as code with Terraform, and Kubernetes
+clusters at scale. Strong background in Linux, observability, and security hardening.
+
+Experience:
+- CloudOps Inc., Senior SRE (2020-present)
+  Managed multi-region Kubernetes clusters and incident response.
+  Designed CI/CD pipelines with GitHub Actions and ArgoCD.
+- HostingCo, DevOps Engineer (2017-2020)
+  Migrated services from on-prem to AWS.
+
+Skills:
+Linux, Docker, Kubernetes, AWS, GCP, Azure, Git, GitHub Actions, Python,
+Bash, Terraform, Agile, Scrum
+
+Education:
+B.Sc. Computer Science
+"
 sample_cv_1,"Ayşe Yılmaz — Yazılım Geliştirici
 Özet: 5 yıl Python ile backend geliştirme. FastAPI ve Django ile REST API tasarımı. PostgreSQL, Redis. Docker ve CI/CD (GitHub Actions). Mikroservis deneyimi. Agile/Scrum.
 

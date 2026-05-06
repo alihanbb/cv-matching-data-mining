@@ -10,7 +10,19 @@ def test_validate_processed():
     assert len(out) == 1
 
 
-def test_ground_truth_invalid():
-    df = pd.DataFrame({"cv_id": [1], "job_id": [2], "relevant": [2]})
+def test_ground_truth_accepts_graded_labels():
+    df = pd.DataFrame({"cv_id": [1, 2, 3, 4], "job_id": [10, 10, 11, 11], "relevant": [0, 1, 2, 3]})
+    out = validate_ground_truth_df(df)
+    assert sorted(out["relevant"].tolist()) == [0, 1, 2, 3]
+
+
+def test_ground_truth_accepts_relevance_alias():
+    df = pd.DataFrame({"cv_id": [1, 2], "job_id": [10, 10], "relevance": [3, 0]})
+    out = validate_ground_truth_df(df)
+    assert "relevant" in out.columns
+
+
+def test_ground_truth_invalid_out_of_range():
+    df = pd.DataFrame({"cv_id": [1], "job_id": [2], "relevant": [5]})
     with pytest.raises(ValueError):
         validate_ground_truth_df(df)

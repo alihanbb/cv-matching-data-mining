@@ -1,0 +1,20 @@
+Selin Aydin
+Frontend Engineer
+
+Summary:
+5 years of experience building user interfaces with React and TypeScript.
+Strong knowledge of HTML, CSS, modern build tooling, and accessibility.
+Some experience with Node.js for BFF layers and integration tests.
+
+Experience:
+- WebStudio, Senior Frontend Engineer (2021-present)
+  Designed component libraries with React and TypeScript.
+  Improved performance and accessibility across multiple products.
+- DigitalAgency, Frontend Developer (2019-2021)
+  Built marketing sites and dashboards in Vue.js and React.
+
+Skills:
+JavaScript, TypeScript, React, Node, HTML, CSS, Git, Agile, Scrum
+
+Education:
+B.Sc. Software Engineering

@@ -1,0 +1,22 @@
+Ayse Yilmaz
+Senior Backend Engineer
+
+Summary:
+6 years of experience building Python backend services with FastAPI and Django.
+Strong knowledge of PostgreSQL, Redis, and message queues (Kafka).
+Hands-on with Docker, Kubernetes, and GitHub Actions CI/CD pipelines.
+Comfortable working in agile teams; mentored junior engineers.
+
+Experience:
+- ABC Tech, Senior Backend Developer (2021-present)
+  Designed REST APIs, microservices, and asynchronous workers in Python.
+  Migrated legacy monolith to containerized microservices on Kubernetes.
+- XYZ A.S., Backend Developer (2019-2021)
+  Built ETL pipelines and SQL data services on PostgreSQL and Spark.
+
+Skills:
+Python, FastAPI, Django, REST API, PostgreSQL, Redis, Kafka, Docker,
+Kubernetes, GitHub Actions, Git, Linux, Agile, Scrum, AWS, NLP
+
+Education:
+B.Sc. Computer Engineering

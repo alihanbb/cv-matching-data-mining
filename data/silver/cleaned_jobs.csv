@@ -1,1 +1,69 @@
+job_id,text
+job_001_python_backend,"Senior Python Backend Engineer
 
+Description:
+We are looking for an experienced Python backend engineer to design and operate
+scalable microservices for our fintech platform. You will own service design,
+API contracts, and CI/CD quality.
+
+Responsibilities:
+- Design REST APIs and microservices in Python (FastAPI or Django).
+- Operate services on Docker and Kubernetes in AWS.
+- Build CI/CD pipelines and code review culture.
+- Collaborate with data and frontend teams in agile sprints.
+
+Requirements:
+- At least 5 years of experience with Python backend development.
+- Strong SQL knowledge with PostgreSQL.
+- Hands-on Docker and Kubernetes experience.
+- Familiarity with Git and CI/CD tools.
+
+Nice to have:
+- Experience with Kafka or other message queues.
+- AWS or GCP cloud experience.
+"
+job_002_data_scientist,"Data Scientist
+
+Description:
+We are hiring a data scientist to design machine learning and NLP models that
+power our recommendation and risk scoring products.
+
+Responsibilities:
+- Build classification and ranking models with scikit-learn or PyTorch.
+- Design experiment and evaluation protocols with offline metrics.
+- Work with engineers to deploy models in production.
+
+Requirements:
+- Minimum 3 years of experience in machine learning or data science.
+- Strong Python skills with pandas, NumPy, and scikit-learn.
+- SQL knowledge for working with large datasets.
+- Familiarity with NLP and text mining techniques.
+
+Nice to have:
+- Experience with PyTorch or TensorFlow.
+- Cloud experience on AWS or GCP.
+- Familiarity with Spark or distributed data tools.
+"
+job_003_devops_sre,"Senior DevOps / SRE Engineer
+
+Description:
+We are looking for a senior DevOps / SRE engineer to operate our cloud-native
+platform across AWS and GCP. You will own infrastructure-as-code, CI/CD,
+observability, and incident response.
+
+Responsibilities:
+- Operate Kubernetes clusters in production.
+- Design CI/CD pipelines using GitHub Actions.
+- Build infrastructure as code with Terraform.
+- Improve observability, on-call practices, and security hardening.
+
+Requirements:
+- At least 5 years of experience in DevOps, SRE, or platform engineering.
+- Strong Linux, Docker, and Kubernetes experience.
+- Hands-on AWS or GCP cloud experience.
+- Familiarity with Git and CI/CD tooling.
+
+Nice to have:
+- Python or Bash automation experience.
+- Background in agile teams.
+"

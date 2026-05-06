@@ -64,6 +64,6 @@ def build_processed_from_raw(
 
     out_cvs_csv.parent.mkdir(parents=True, exist_ok=True)
     out_jobs_csv.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(cv_rows).to_csv(out_cvs_csv, index=False)
-    pd.DataFrame(job_rows).to_csv(out_jobs_csv, index=False)
+    pd.DataFrame(cv_rows, columns=["cv_id", "text"]).to_csv(out_cvs_csv, index=False)
+    pd.DataFrame(job_rows, columns=["job_id", "text"]).to_csv(out_jobs_csv, index=False)
     return len(cv_rows), len(job_rows)

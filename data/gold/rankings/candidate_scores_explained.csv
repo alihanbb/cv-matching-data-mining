@@ -1,7 +1,19 @@
-job_id,cv_id,score,rank_for_job,score_tfidf,score_skills,score_experience,matched_skills,missing_skills,experience_note
-10,sample_cv_1,1.0,1,0.25062695029322307,0.3333333333333333,1.0,docker;python,,ilan_yılı_belirsiz
-10,sample_cv_2,0.09090909090909093,2,0.0,0.0,1.0,,docker;python,ilan_yılı_belirsiz
-11,sample_cv_2,1.0,1,0.08924984271618229,0.6666666666666666,1.0,react;typescript,,ilan_yılı_belirsiz
-11,sample_cv_1,0.09090909090909093,2,0.018227967322631912,0.0,1.0,,react;typescript,ilan_yılı_belirsiz
-12,sample_cv_1,1.0,1,0.01421982598576055,0.14285714285714285,1.0,sql,machine learning,ilan_yılı_belirsiz
-12,sample_cv_2,0.09090909090909093,2,0.0,0.0,1.0,,machine learning;sql,ilan_yılı_belirsiz
+job_id,cv_id,rank_for_job,tfidf_score,semantic_score,skill_score,experience_score,final_score,matched_skills,missing_skills,explanation
+job_001_python_backend,cv_001_python_backend,1,0.27957144484956753,0.8742564916610718,0.5714285714285714,1.0,0.9959183673469387,agile;aws;docker;git;kafka;kubernetes;python;sql,gcp,deneyim_tamam:6.0_>=_5.0
+job_001_python_backend,cv_004_devops,2,0.11873004861248757,0.6328622102737427,0.5833333333333334,1.0,0.6620700261874695,agile;aws;docker;gcp;git;kubernetes;python,kafka;sql,deneyim_tamam:7.0_>=_5.0
+job_001_python_backend,sample_cv_1,3,0.08096834380820189,0.7769173979759216,0.36363636363636365,0.0,0.5161993434895943,agile;docker;python;sql,aws;gcp;git;kafka;kubernetes,deneyim_eksik:0.0_<_gerekli_5.0
+job_001_python_backend,cv_002_data_scientist,4,0.05151266812446486,0.5574594736099243,0.2631578947368421,0.8,0.40487994311000686,aws;docker;git;python;sql,agile;gcp;kafka;kubernetes,deneyim_eksik:4.0_<_gerekli_5.0
+job_001_python_backend,cv_003_frontend,5,0.04660242671781373,0.5813896656036377,0.14285714285714285,1.0,0.3902813734507496,agile;git,aws;docker;gcp;kafka;kubernetes;python;sql,deneyim_tamam:5.0_>=_5.0
+job_001_python_backend,sample_cv_2,6,0.00774615999663677,0.22848135232925415,0.0,0.0,0.0,,agile;aws;docker;gcp;git;kafka;kubernetes;python;sql,deneyim_eksik:0.0_<_gerekli_5.0
+job_002_data_scientist,cv_002_data_scientist,1,0.3426070928546662,0.789603054523468,0.6875,1.0,1.0,aws;machine learning;nlp;numpy;pandas;python;pytorch;scikit-learn;spark;sql;tensorflow,gcp,deneyim_tamam:4.0_>=_3.0
+job_002_data_scientist,cv_001_python_backend,2,0.05398164281166054,0.5680967569351196,0.25,1.0,0.45616990092078924,aws;nlp;python;spark;sql,gcp;machine learning;numpy;pandas;pytorch;scikit-learn;tensorflow,deneyim_tamam:6.0_>=_3.0
+job_002_data_scientist,cv_004_devops,3,0.047081592340209893,0.5245552659034729,0.15789473684210525,1.0,0.398403375149459,aws;gcp;python,machine learning;nlp;numpy;pandas;pytorch;scikit-learn;spark;sql;tensorflow,deneyim_tamam:7.0_>=_3.0
+job_002_data_scientist,cv_003_frontend,4,0.0336853641088184,0.4931691586971283,0.0,1.0,0.321540361491217,,aws;gcp;machine learning;nlp;numpy;pandas;python;pytorch;scikit-learn;spark;sql;tensorflow,deneyim_tamam:5.0_>=_3.0
+job_002_data_scientist,sample_cv_1,5,0.007118279245238914,0.5593773126602173,0.125,0.0,0.2671408763065144,python;sql,aws;gcp;machine learning;nlp;numpy;pandas;pytorch;scikit-learn;spark;tensorflow,deneyim_eksik:0.0_<_gerekli_3.0
+job_002_data_scientist,sample_cv_2,6,0.0,0.15258784592151642,0.0,0.0,0.0,,aws;gcp;machine learning;nlp;numpy;pandas;python;pytorch;scikit-learn;spark;sql;tensorflow,deneyim_eksik:0.0_<_gerekli_3.0
+job_003_devops_sre,cv_004_devops,1,0.32839101787387165,0.7855831384658813,0.8,1.0,1.0,agile;aws;docker;gcp;git;kubernetes;linux;python,,deneyim_tamam:7.0_>=_5.0
+job_003_devops_sre,cv_001_python_backend,2,0.11472910402044319,0.6420774459838867,0.5,1.0,0.6164308663834076,agile;aws;docker;git;kubernetes;linux;python,gcp,deneyim_tamam:6.0_>=_5.0
+job_003_devops_sre,cv_003_frontend,3,0.051941807390539836,0.5915774703025818,0.15384615384615385,1.0,0.4345230498792245,agile;git,aws;docker;gcp;kubernetes;linux;python,deneyim_tamam:5.0_>=_5.0
+job_003_devops_sre,cv_002_data_scientist,4,0.03270773638116081,0.48715561628341675,0.21052631578947367,0.8,0.3493645663482862,aws;docker;git;python,agile;gcp;kubernetes;linux,deneyim_eksik:4.0_<_gerekli_5.0
+job_003_devops_sre,sample_cv_1,5,0.031835114517697057,0.5793064832687378,0.2727272727272727,0.0,0.3359003804259667,agile;docker;python,aws;gcp;git;kubernetes;linux,deneyim_eksik:0.0_<_gerekli_5.0
+job_003_devops_sre,sample_cv_2,6,0.0,0.16432878375053406,0.0,0.0,0.0,,agile;aws;docker;gcp;git;kubernetes;linux;python,deneyim_eksik:0.0_<_gerekli_5.0
