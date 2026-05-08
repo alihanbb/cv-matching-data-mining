@@ -17,25 +17,43 @@ _ROLE_PATTERNS = (
     r"\b(engineer|developer|scientist|analyst|consultant)\b",
 )
 
+_EN_YEAR_PATTERNS = [
+    r"(\d+(?:\.\d+)?)\s*\+\s*(?:years?|yrs?\.?)\b",
+    r"(\d+(?:\.\d+)?)\s*(?:years?|yrs?\.?)\s+(?:of\s+)?(?:experience|exp\.?)\b",
+    r"(?:at least|minimum|min\.?)\s*(\d+(?:\.\d+)?)\s*(?:years?|yrs?\.?)\b",
+    r"(?:experience|exp\.?)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:years?|yrs?\.?)\b",
+]
+_TR_YEAR_PATTERNS = [
+    r"(\d+(?:\.\d+)?)\s*\+\s*(?:yıl|yil|senelik)\b",
+    r"(\d+(?:\.\d+)?)\s*(?:yıl|yil|senelik)\s*(?:deneyim|tecrübe|tecrube)?",
+    r"(?:en az|minimum|min\.?)\s*(\d+(?:\.\d+)?)\s*(?:yıl|yil|senelik)\b",
+    r"(\d+(?:\.\d+)?)\s*(?:senelik|senelik\s+tecrübe|senelik\s+tecrube|yıllık\s+tecrübe|yillik\s+tecrube)\b",
+]
+
+
+def _collect_years(text: str) -> list[float]:
+    years: list[float] = []
+    for pat in _EN_YEAR_PATTERNS:
+        for m in re.finditer(pat, text, re.IGNORECASE):
+            try:
+                years.append(float(m.group(1)))
+            except (ValueError, IndexError):
+                continue
+    lowered = text.lower()
+    for pat in _TR_YEAR_PATTERNS:
+        for m in re.finditer(pat, lowered):
+            try:
+                years.append(float(m.group(1)))
+            except (ValueError, IndexError):
+                continue
+    return years
+
 
 def extract_experience_signals(text: str) -> ExperienceSignals:
     if not text:
         return ExperienceSignals(years_mentioned=[], role_hints=[])
     t = text.lower()
-    years: list[float] = []
-    for m in re.finditer(
-        r"(\d+(?:\.\d+)?)\s*\+?\s*(?:years?|yrs?\.?)\s+(?:of\s+)?(?:experience|exp\.?)",
-        t,
-    ):
-        try:
-            years.append(float(m.group(1)))
-        except ValueError:
-            continue
-    for m in re.finditer(r"(?:experience|exp\.?)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:years?|yrs?\.?)", t):
-        try:
-            years.append(float(m.group(1)))
-        except ValueError:
-            continue
+    years = _collect_years(text)
     roles: list[str] = []
     for pat in _ROLE_PATTERNS:
         for m in re.finditer(pat, t, re.IGNORECASE):
@@ -44,34 +62,29 @@ def extract_experience_signals(text: str) -> ExperienceSignals:
 
 
 def extract_job_required_years(text: str) -> float | None:
-    """Minimum required years of experience mentioned in a job posting (heuristic)."""
     if not text:
         return None
-    t = text.lower()
+    lowered = text.lower()
     candidates: list[float] = []
-    for m in re.finditer(
-        r"(?:at least|minimum|min\.?)\s*(\d+(?:\.\d+)?)\s*(?:years?|yrs?\.?)",
-        t,
-    ):
-        try:
-            candidates.append(float(m.group(1)))
-        except ValueError:
-            continue
-    for m in re.finditer(
-        r"(\d+(?:\.\d+)?)\s*\+?\s*(?:years?|yrs?\.?)\s+(?:of\s+)?(?:experience|exp\.?)",
-        t,
-    ):
-        try:
-            candidates.append(float(m.group(1)))
-        except ValueError:
-            continue
-    for m in re.finditer(r"(\d+(?:\.\d+)?)\s*\+\s*(?:years?|yrs?\.?)", t):
-        try:
-            candidates.append(float(m.group(1)))
-        except ValueError:
-            continue
+    for pat in _EN_YEAR_PATTERNS:
+        for m in re.finditer(pat, lowered):
+            try:
+                candidates.append(float(m.group(1)))
+            except (ValueError, IndexError):
+                continue
+    for pat in _TR_YEAR_PATTERNS:
+        for m in re.finditer(pat, lowered):
+            try:
+                candidates.append(float(m.group(1)))
+            except (ValueError, IndexError):
+                continue
     return max(candidates) if candidates else None
 
 
 def cv_max_years(signals: ExperienceSignals) -> float:
     return max(signals.years_mentioned) if signals.years_mentioned else 0.0
+
+
+def cv_total_years_estimate(signals: ExperienceSignals) -> float:
+    """Conservative total-years signal: max of explicit mentions (extendable)."""
+    return cv_max_years(signals)

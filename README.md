@@ -63,147 +63,192 @@ python main.py --no-semantic
 
 ---
 
-## Advanced model: TF-IDF + SBERT + Skill Score + Experience Score
+## Advanced hybrid model (V1): TF-IDF + SBERT + requirement coverage + experience
 
-Dört kanal birleştirilir:
+Kanallar:
 
 1. **TF-IDF cosine** — lexical taban.
-2. **Semantic cosine (SBERT)** — `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`.
-3. **Skill Jaccard** — `|cv_skills ∩ job_skills| / |cv_skills ∪ job_skills|`.
-4. **Experience match** — CV deneyimi vs ilan minimum gereksinimi (oranlı / belirsizde 1.0).
+2. **Semantic cosine (SBERT)** — varsayılan `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (encode + L2 normalize; yüklenemezse anlaşılır uyarı).
+3. **Skill score** — ilan içi *must-have / nice-to-have* bölümlerinden türetilen beceri kapsamı:
+   `skill_score = 0.75 * must_have_coverage + 0.25 * nice_to_have_coverage` (nice-to-have yoksa `skill_score = must_have_coverage`).
+   Yanında **skill Jaccard** kolonu tutulur (`skill_jaccard`).
+4. **Experience** — CV ve ilan metninden İngilizce/Türkçe yıl ifadeleri + minimum gereksinim eşlemesi.
 
 ```bash
 pip install -e ".[semantic]"
 python main.py --semantic
 ```
 
----
+## BM25 and Hybrid V2
 
-## Final score formula
+- **BM25** (`rank-bm25`): her ilan için CV corpus üzerinde skor; iş bazında [0,1] min–max normalize.
+- **Hybrid V2 (raw ağırlık formülü)**:
 
 ```
-final_score =
-  0.35 * tfidf_score +
-  0.35 * semantic_score +
+final_score_v2_bm25 =
+  0.25 * tfidf_score +
+  0.25 * semantic_score +
+  0.20 * bm25_score +
   0.20 * skill_score +
   0.10 * experience_score
 ```
 
-Semantic kanal kapalıysa ağırlık kalan üç kanal arasında otomatik yeniden normalize edilir.
-
-Açıklanabilir CSV şeması:
-
+```bash
+pip install -e ".[bm25]"
+python main.py --semantic --bm25
 ```
-job_id, cv_id, rank_for_job,
-tfidf_score, semantic_score, skill_score, experience_score, final_score,
-matched_skills, missing_skills, explanation
+
+## Weight optimization and learned fusion
+
+```bash
+python main.py --optimize-weights [--bm25]   # artifacts/best_fusion_weights.json + weight_search_results.csv
+python main.py --use-best-weights --semantic [--bm25] --ingest  # sonraki koşuda ağırlıkları yükle
+python main.py --train-fusion               # artifacts/learned_fusion_weights.json (PyTorch, ground truth gerekli)
 ```
+
+Öğrenilen softmax-ağırlıklar mevcutsa `candidate_scores_explained.csv` içine `learned_fusion_score` yazılır.
+
+## Cross-encoder rerank (opsiyonel)
+
+```bash
+pip install -e ".[semantic]"
+python main.py --semantic --bm25
+python main.py --rerank
+```
+
+Model: `cross-encoder/ms-marco-MiniLM-L-6-v2` — her iş için ilk 20 adayı yeniden sıralar.
 
 ---
 
-## How to run
+## Final score formula and auditing
 
-### 1. Setup
+**Raw (raporlanan `final_score`)** — gösterilen bileşen skorları üzerinden:
+
+```
+final_score_raw =
+  w_tfidf * tfidf_score + w_sem * semantic_score + w_skill * skill_score + w_exp * experience_score
+```
+
+Varsayılan V1 ağırlıkları `config/config.yaml` içinde (0.35 / 0.35 / 0.20 / 0.10). Sıralama için kanallar **iş bazında min–max normalize** edilerek füze edilir (`ranking_score`).
+
+Açıklanabilir CSV ek kolonları:
+
+- `final_score_raw`, `final_score_normalized`, `score_check`, `score_diff`, `score_warning` (`score_diff > 0.01` ise uyarı)
+- `bm25_score`, `final_score_v2_bm25`, `must_have_coverage`, `nice_to_have_coverage`, ilgili skill listeleri
+- `cv_years_experience`, `job_min_years_experience`, `explanation`, `suggested_improvements`
+
+## Requirement coverage (skill_score)
+
+`config/skills.yaml` ile alias + kategori tabanlı skill lexicon (ör. `k8s→kubernetes`, `postgres→postgresql`, `.net→csharp`).
+
+## PII and silver JSONL
+
+- `privacy.anonymize: true` (varsayılan): e-posta / URL / telefon benzeri desenler skorlamadan önce maskelenir.
+- `silver.write_unified_resumes: true` → `data/silver/unified_resumes.jsonl` (bölümler, skill’ler, `cv_quality_score`).
+
+---
+
+## Datasets used and imports
+
+Harici paketler:
+
+```bash
+pip install -e ".[data_imports]"   # Hugging Face
+pip install -e ".[kaggle_import]"  # Kaggle CLI
+```
+
+Scriptler: `scripts/import_hf_cv_matcher.py`, `scripts/import_vacancy_resume_dataset.py`, `scripts/import_kaggle_resume_dataset.py`
+
+Ayrıntı: [docs/DATASETS.md](docs/DATASETS.md)
+
+---
+
+## Model comparison and evaluation export
+
+Ground truth varken:
+
+```bash
+python main.py --export-eval-csv
+```
+
+Çıktı: `data/gold/evaluation/evaluation_results.csv`, `data/gold/evaluation/model_comparison.csv`
+
+Karşılaştırılan modeller: TF-IDF baseline, TF-IDF+SBERT, Hybrid V1, Hybrid V2+BM25, Optimized Fusion (best weights dosyası varsa).
+
+Metrikler: Precision@K, Recall@K, NDCG@K, MRR, MAP.
+
+---
+
+## How to run (nihai komutlar)
+
+```bash
+python main.py --ingest
+python main.py
+python main.py --semantic
+python main.py --bm25
+python main.py --evaluate
+python main.py --export-eval-csv
+python main.py --optimize-weights
+python main.py --use-best-weights
+python main.py --train-fusion
+python main.py --rerank
+streamlit run app/streamlit_app.py
+```
+
+> Not: `--bm25` hem anlamsal hem BM25 paketinin kurulu olmasını gerektirir.
+
+### Setup
 
 ```bash
 cd cv-matching-data-mining
 python -m venv .venv
-.venv\Scripts\activate     # Windows
-# source .venv/bin/activate  # Linux / macOS
-pip install -e ".[dev]"
+.venv\Scripts\activate
+pip install -e ".[dev,semantic,bm25,dashboard]"
 ```
 
-Optional extras:
-
-```bash
-pip install -e ".[semantic]"    # SBERT semantic kanal
-pip install -e ".[dashboard]"   # Streamlit + matplotlib
-```
-
-### 2. Bronze → Silver
+### Bronze → Silver
 
 ```bash
 python main.py --ingest
 ```
 
-### 3. Pipeline
+### Pipeline
 
 ```bash
-python main.py                # default (config.embeddings.enabled belirler)
-python main.py --no-semantic  # hızlı baseline
-python main.py --semantic     # SBERT dahil
-python main.py --evaluate     # ground_truth ile metrikler
+python main.py --semantic        # V1 sıralama (BM25 kapalıysa)
+python main.py --semantic --bm25 # V2 sıralama
+python main.py --evaluate       # ground_truth ile log metrikleri
 ```
 
-Çıktılar:
-
-- `data/gold/rankings/candidate_scores.csv`
-- `data/gold/rankings/candidate_scores_explained.csv`
-- `data/gold/models/tfidf_model.pkl`
-- `artifacts/runs/<UTC>/manifest.json`
+Çıktılar: `candidate_scores.csv`, `candidate_scores_explained.csv`, `tfidf_model.pkl`, `artifacts/runs/...`
 
 ---
 
-## How to run dashboard
-
-Açıklanabilir skor dosyasını görsel arayüzden incelemek için:
+## Dashboard
 
 ```bash
 pip install -e ".[dashboard]"
 streamlit run app/streamlit_app.py
 ```
 
-Dashboard özellikleri:
-
-- İş ilanı seçimi
-- Top-N aday filtresi
-- Skor bileşenleri (`tfidf_score`, `semantic_score`, `skill_score`, `experience_score`, `final_score`)
-- Eşleşen / eksik beceriler
-- Aday başına açıklama metni
-- İlan ve CV ham metnine erişim
+Sekmeler: Candidate Ranking, CV Profile (unified JSONL), Requirement Coverage, Evaluation Metrics, Model Comparison, Score Debug.
 
 ---
 
-## Evaluation metrics
+## Limitations
 
-`data/evaluation/ground_truth.csv` formatı:
-
-```
-job_id,cv_id,relevance
-job_001_python_backend,cv_001_python_backend,3
-job_001_python_backend,cv_003_frontend,0
-...
-```
-
-Relevance dereceleri:
-
-- `3` — çok uygun
-- `2` — uygun
-- `1` — zayıf uygun
-- `0` — uygun değil
-
-Çalıştırma:
-
-```bash
-python main.py --evaluate
-```
-
-Loglanan metrikler: `topk_hit_rate_K`, `precision_at_K`, `ndcg_at_K`, `mrr`, `map`.
-
-NDCG, dereceli relevans ile hesaplanır; binary (0/1) etiketler de geriye uyumludur.
+- Skill / must-have ayrımı kural tabanlıdır; serbest metin farklı başlıklarda hata yapabilir.
+- Transformer modelleri ilk indirmede ağ ve disk gerektirir; kurumsal ortamda cache önerilir.
+- Kaggle / HF import scriptleri şema değişikliklerine karşı ince ayar gerektirebilir.
+- Hedef NDCG@5 ikinci veri setine göre değişir; %15–25 iyileştirme iddiası deneysel olarak doğrulanmalıdır.
 
 ---
 
 ## Future work
 
-- BM25 / hybrid retrieval kanalı.
-- Cross-encoder rerank (örn. `ms-marco-MiniLM`).
-- Validation seti üzerinden öğrenilmiş fusion ağırlıkları (Learning-to-Rank).
-- Beceri eş anlamlı / ontoloji genişletmesi (ESCO veya benzeri).
-- Türkçe morfoloji desteği (lemmatizer / stemmer).
-- Model registry + versiyonlu artifact’lar.
-- API + auth + rate limit; KVKK uyumlu denetim günlüğü.
-- Dashboard içine offline metrik karşılaştırma sekmesi.
+- Ontoloji genişletmesi (ESCO vb.), aktif öğrenme ile etiket azaltma.
+- Çok dilli JD başlık sınıflandırıcısı (must / nice segmentasyonu).
+- Model registry ve üretim API’si + denetim günlüğü.
 
 ---
 
@@ -214,7 +259,8 @@ cv-matching-data-mining/
 ├── app/
 │   └── streamlit_app.py        # Dashboard
 ├── config/
-│   └── config.yaml             # Tek doğruluk: yollar, ağırlıklar, model adı
+│   ├── config.yaml
+│   └── skills.yaml             # Skill alias + kategori lexicon
 ├── data/
 │   ├── bronze/                 # Ham dosyalar
 │   ├── silver/                 # Temiz tablolar + canonical JSONL
@@ -259,6 +305,9 @@ GitHub Actions: `.github/workflows/ci.yml` (`pytest` + `python main.py --no-sema
 | [docs/RAPOR.md](docs/RAPOR.md) | KDD süreciyle hizalı veri madenciliği raporu |
 | [docs/PIPELINE_DIAGRAM.md](docs/PIPELINE_DIAGRAM.md) | Mermaid pipeline diyagramı |
 | [docs/KVKK_VE_GUVENLIK.md](docs/KVKK_VE_GUVENLIK.md) | Kişisel veri ve anonimleştirme |
+| [docs/GROUND_TRUTH_GUIDE.md](docs/GROUND_TRUTH_GUIDE.md) | Etiket dosyası şeması |
+| [docs/MODEL_COMPARISON.md](docs/MODEL_COMPARISON.md) | Model karşılaştırma çıktıları |
+| [docs/DATASETS.md](docs/DATASETS.md) | Harici veri setleri ve import |
 | [docs/PROJE_KAVRAMSAL_REHBER.md](docs/PROJE_KAVRAMSAL_REHBER.md) | Senior data scientist bakışıyla genel rehber |
 | [docs/CALISTIRMA_ORTAMI_VE_GELISTIRME_YONETIMI.md](docs/CALISTIRMA_ORTAMI_VE_GELISTIRME_YONETIMI.md) | Operasyon ve geliştirme yönetimi |
 | [docs/MEVCUT_DURUM_VE_MIMARI.md](docs/MEVCUT_DURUM_VE_MIMARI.md) | Güncel durum ve mimari |

@@ -16,10 +16,9 @@ def _relevance_by_job(ground_truth: pd.DataFrame) -> dict[str, set[str]]:
 
 
 def _graded_by_job(ground_truth: pd.DataFrame) -> dict[str, dict[str, int]]:
-    """job_id -> {cv_id: grade}; supports graded NDCG (relevance ∈ {0..3})."""
-    sub = ground_truth[ground_truth["relevant"].astype(int) >= 1]
+    """job_id -> {cv_id: grade}; includes all graded relevance rows (0..3)."""
     m: dict[str, dict[str, int]] = defaultdict(dict)
-    for _, r in sub.iterrows():
+    for _, r in ground_truth.iterrows():
         m[str(r["job_id"])][str(r["cv_id"])] = int(r["relevant"])
     return dict(m)
 

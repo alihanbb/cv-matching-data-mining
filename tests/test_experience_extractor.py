@@ -38,3 +38,13 @@ def test_extract_job_required_years_returns_max_when_multiple() -> None:
 
 def test_extract_job_required_years_none_when_unknown() -> None:
     assert extract_job_required_years("Friendly team and remote work.") is None
+
+
+def test_extract_cv_years_turkish() -> None:
+    text = "En az 4 yıl Python deneyimi ve 3+ yıl kubernetes kullanımı."
+    sig = extract_experience_signals(text)
+    assert max(sig.years_mentioned) >= 4.0
+
+
+def test_extract_job_turkish_min_years() -> None:
+    assert extract_job_required_years("Aranan: minimum 2 yıl yazılım deneyimi.") == 2.0

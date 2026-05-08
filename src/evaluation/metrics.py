@@ -49,3 +49,23 @@ def precision_at_k(ranked: pd.DataFrame, ground_truth: pd.DataFrame, k: int) -> 
         tp = sum(1 for cv in cvs if (cv, job) in rel)
         precisions.append(tp / len(cvs))
     return sum(precisions) / max(len(precisions), 1)
+
+
+def recall_at_k(ranked: pd.DataFrame, ground_truth: pd.DataFrame, k: int) -> float:
+    """Average recall@k per job: |rel ∩ topk| / |rel|."""
+    by_job: dict[str, set[str]] = {}
+    for _, r in ground_truth.iterrows():
+        if int(r["relevant"]) < 1:
+            continue
+        jid = str(r["job_id"])
+        by_job.setdefault(jid, set()).add(str(r["cv_id"]))
+    if not by_job:
+        return 0.0
+    recalls: list[float] = []
+    for job, rel in by_job.items():
+        top = ranked[(ranked["job_id"].astype(str) == job) & (ranked["rank_for_job"] <= k)]
+        retrieved = set(top["cv_id"].astype(str).tolist())
+        if not rel:
+            continue
+        recalls.append(len(rel & retrieved) / len(rel))
+    return sum(recalls) / max(len(recalls), 1)

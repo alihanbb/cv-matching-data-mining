@@ -1,54 +1,94 @@
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
-from src.evaluation.metrics import precision_at_k, top_k_accuracy
-from src.evaluation.ranking_metrics import mean_average_precision, mean_reciprocal_rank, ndcg_at_k
-from src.extraction.experience_extractor import (
-    cv_max_years,
-    extract_experience_signals,
-    extract_job_required_years,
+from src.config.defaults import (
+    FUSION_V1_WEIGHTS,
+    FUSION_V2_WEIGHTS,
+    SCORE_AUDIT_WARN_THRESHOLD,
 )
-from src.extraction.skill_extractor import extract_skills
-from src.features.semantic_encoder import dense_cosine_similarity, encode_normalized, try_load_semantic_encoder
+from src.evaluation.metrics import precision_at_k, recall_at_k, top_k_accuracy
+from src.evaluation.ranking_metrics import mean_average_precision, mean_reciprocal_rank, ndcg_at_k
+from src.extraction.skill_extractor import extract_skill_ids_sets_for_corpus
+from src.extraction.skills_lexicon import load_skills_lexicon
 from src.features.tfidf_vectorizer import TfidfFeatureBuilder
 from src.ingest.build_processed import build_processed_from_raw
-from src.models.matcher import enrich_with_explanations, rank_candidates_for_jobs
-from src.models.similarity import cosine_pairs
+from src.ingest.cv_corpus import extra_cvs_from_ingest_config
+from src.models.matcher import enrich_detailed, rank_candidates_for_jobs
+from src.pipeline.io import read_processed_csv
+from src.pipeline.matching_inputs import build_matching_matrices
 from src.preprocessing.cleaner import TextCleaner
+from src.preprocessing.pii import anonymize_text
+from src.processing.cv_sections import cv_quality_score, segment_cv, write_unified_resumes_jsonl
 from src.schemas.documents import validate_ground_truth_df, validate_processed_df
-from src.scoring.fusion import experience_match_matrix, fuse_scores, skill_jaccard_matrix
+from src.scoring.fusion import fuse_scores, fuse_weighted_raw, skill_jaccard_matrix
+from src.scoring.score_audit import add_score_audit_columns
 from src.utils.experiment import write_run_manifest
 from src.utils.helpers import ensure_parent, resolve_path
+from sklearn.metrics.pairwise import cosine_similarity
 
 logger = logging.getLogger(__name__)
 
 
-def _read_processed_or_raise(path: Path, id_col: str) -> pd.DataFrame:
-    """Read a Silver CSV; raise a clear error when missing or empty."""
-    if not path.is_file():
-        raise FileNotFoundError(
-            f"Processed table not found: {path}\n"
-            "Run the ingest step first: python main.py --ingest"
-        )
-    try:
-        df = pd.read_csv(path)
-    except pd.errors.EmptyDataError:
-        raise ValueError(
-            f"Processed table is empty (no header): {path}\n"
-            "Place input files under data/bronze/, then re-run with --ingest."
-        ) from None
-    if id_col not in df.columns:
-        raise ValueError(
-            f"Processed table missing column '{id_col}': {path}\n"
-            "Re-run ingest with valid bronze data."
-        )
-    return df
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
 
+def _maybe_unified_jsonl(
+    root: Path,
+    cvs: pd.DataFrame,
+    lex,
+    cleaner: TextCleaner,
+    out_path: Path,
+    *,
+    anonymize: bool,
+) -> None:
+    rows: list[dict[str, Any]] = []
+    for _, r in cvs.iterrows():
+        raw_text = str(r["text"])
+        work_text = anonymize_text(raw_text) if anonymize else raw_text
+        cleaned = cleaner.clean(work_text)
+        sections = segment_cv(work_text)
+        skill_ids = set()
+        for part in sections.values():
+            skill_ids |= set(s for s in extract_skill_ids_sets_for_corpus([part], lex)[0])
+        skill_ids |= set(extract_skill_ids_sets_for_corpus([work_text], lex)[0])
+        cats = lex.categories_for(skill_ids)
+        from src.extraction.experience_extractor import cv_total_years_estimate, extract_experience_signals
+        sig = extract_experience_signals(work_text)
+        years = float(cv_total_years_estimate(sig))
+        q = cv_quality_score(sections, work_text)
+        rows.append(
+            {
+                "cv_id": str(r["cv_id"]),
+                "raw_text": raw_text,
+                "cleaned_text": cleaned,
+                "sections": sections,
+                "extracted_skills": sorted(skill_ids),
+                "skill_categories": cats,
+                "total_years_experience": years,
+                "cv_quality_score": q,
+            }
+        )
+    write_unified_resumes_jsonl(rows, out_path)
+    logger.info("Wrote unified resumes JSONL (%d rows): %s", len(rows), out_path)
+
+
+def _pair_value(mat: np.ndarray, cv_pos: dict, job_pos: dict, row: pd.Series) -> float:
+    i = cv_pos[str(row["cv_id"])]
+    j = job_pos[str(row["job_id"])]
+    return float(mat[i, j])
+
+
+# ---------------------------------------------------------------------------
+# Public pipeline entry point
+# ---------------------------------------------------------------------------
 
 def run_full_pipeline(
     root: Path,
@@ -57,18 +97,13 @@ def run_full_pipeline(
     ingest: bool = False,
     semantic: bool = True,
     evaluate: bool | None = None,
+    bm25: bool = False,
+    write_unified: bool | None = None,
 ) -> dict[str, float]:
     """Run the full CV–job matching pipeline.
 
-    Parameters
-    ----------
-    ingest:
-        Rebuild Silver CSVs from Bronze before scoring.
-    semantic:
-        Enable dense embedding channel when True (and the model is available).
-    evaluate:
-        Force-on / force-off evaluation. When ``None`` (default), evaluation
-        runs automatically when ``data/evaluation/ground_truth.csv`` exists.
+    When ``bm25`` is True or enabled in config, ranking uses Hybrid V2 weights
+    including a BM25 channel (requires ``rank_bm25``).
     """
     paths = cfg["paths"]
     proc_cvs = resolve_path(root, paths["processed_cvs"])
@@ -80,138 +115,215 @@ def run_full_pipeline(
         paths.get("output_explanations", "data/gold/rankings/candidate_scores_explained.csv"),
     )
 
+    if write_unified is None:
+        write_unified = bool(cfg.get("silver", {}).get("write_unified_resumes", False))
+    unified_path = resolve_path(root, cfg.get("silver", {}).get("unified_resumes", "data/silver/unified_resumes.jsonl"))
+
+    # ------------------------------------------------------------------
+    # Optional ingest step
+    # ------------------------------------------------------------------
     if ingest:
         ing = cfg.get("ingest", {})
         raw_cvs = resolve_path(root, ing.get("raw_cvs_dir", "data/bronze/cvs"))
         raw_jobs = resolve_path(root, ing.get("raw_jobs_dir", "data/bronze/job_descriptions"))
-        n_cv, n_job = build_processed_from_raw(raw_cvs, raw_jobs, proc_cvs, proc_jobs)
-        logger.info("Ingest: %d CV files, %d job files -> processed CSVs", n_cv, n_job)
+        extra_cv = extra_cvs_from_ingest_config(root, ing)
+        n_bronze, n_corpus, n_job = build_processed_from_raw(
+            raw_cvs, raw_jobs, proc_cvs, proc_jobs, extra_cv_rows=extra_cv or None
+        )
+        logger.info(
+            "Ingest: %d bronze CV files + %d JSONL corpus rows → %d total CV rows; %d job files → Silver",
+            n_bronze, n_corpus, n_bronze + n_corpus, n_job,
+        )
 
+    # ------------------------------------------------------------------
+    # Build all feature matrices via the single shared builder
+    # ------------------------------------------------------------------
+    bm25_cfg = cfg.get("bm25", {})
+    bm25_enabled_cfg = bool(bm25 or bm25_cfg.get("enabled", False))
+    m = build_matching_matrices(root, cfg, semantic=semantic, bm25=bm25_enabled_cfg)
+
+    # Re-save TF-IDF model (build_matching_matrices does not persist it)
     pre = cfg.get("preprocessing", {})
     cleaner = TextCleaner(
         remove_stopwords=pre.get("remove_stopwords", True),
         lemmatize=pre.get("lemmatize", True),
         language=pre.get("language", "en"),
     )
+    tfidf_cfg = cfg.get("tfidf", {})
+    tfidf_builder = TfidfFeatureBuilder(tfidf_cfg)
+    corpus = m.cvs_df["clean_text"].tolist() + m.jobs_df["clean_text"].tolist()
+    tfidf_builder.fit(corpus)
+    ensure_parent(feat_model)
+    tfidf_builder.save(feat_model)
 
-    cvs = _read_processed_or_raise(proc_cvs, "cv_id")
-    jobs = _read_processed_or_raise(proc_jobs, "job_id")
-    cvs = validate_processed_df(cvs, "cv_id", "text")
-    jobs = validate_processed_df(jobs, "job_id", "text")
-    if cvs.empty or jobs.empty:
-        raise ValueError(
-            "Processed CV or job table is empty.\n"
-            f" - CVs:  {proc_cvs}\n"
-            f" - Jobs: {proc_jobs}\n"
-            "Add files under data/bronze/cvs and data/bronze/job_descriptions, "
-            "then re-run with --ingest."
+    # ------------------------------------------------------------------
+    # Optional unified JSONL output
+    # ------------------------------------------------------------------
+    if write_unified:
+        skill_cfg = cfg.get("skills", {})
+        lex_path = resolve_path(root, skill_cfg.get("path", "config/skills.yaml"))
+        lex = load_skills_lexicon(lex_path)
+        privacy = cfg.get("privacy", {})
+        anonymize = bool(privacy.get("anonymize", True))
+        # Load raw CVs from silver CSV (before clean_text) for JSONL output
+        raw_cvs_df = validate_processed_df(read_processed_csv(proc_cvs, "cv_id"), "cv_id", "text")
+        _maybe_unified_jsonl(root, raw_cvs_df, lex, cleaner, unified_path, anonymize=anonymize)
+
+    # ------------------------------------------------------------------
+    # Fusion configuration
+    # ------------------------------------------------------------------
+    fusion_cfg = cfg.get("fusion", {})
+    weights = dict(fusion_cfg.get("weights", {})) or dict(FUSION_V1_WEIGHTS)
+
+    fusion_v2_cfg = cfg.get("fusion_v2", {})
+    weights_v2 = dict(fusion_v2_cfg.get("weights", {})) or dict(FUSION_V2_WEIGHTS)
+
+    fused_rank_v1, w_used = fuse_scores(
+        m.sim_lex, m.dense_sim, m.skill_score, m.exp_mat, weights, m.dense_enabled, bm25=None
+    )
+
+    if m.bm25_enabled and m.bm25 is not None:
+        fused_rank_used, w_rank = fuse_scores(
+            m.sim_lex, m.dense_sim, m.skill_score, m.exp_mat, weights_v2, m.dense_enabled, bm25=m.bm25
+        )
+    else:
+        fused_rank_used, w_rank = fused_rank_v1, w_used
+
+    logger.info("Fusion weights for ranking (normalized channels): %s", w_rank)
+
+    # ------------------------------------------------------------------
+    # Ranking
+    # ------------------------------------------------------------------
+    top_k = int(cfg.get("matching", {}).get("top_k", 10))
+    dense_for_components = m.dense_sim if m.dense_sim is not None else np.zeros_like(m.sim_lex)
+    bm25_for_components = m.bm25 if m.bm25 is not None else np.zeros_like(m.sim_lex)
+    components = {
+        "tfidf": m.sim_lex,
+        "dense": dense_for_components,
+        "skills": m.skill_score,
+        "experience": m.exp_mat,
+        "bm25": bm25_for_components,
+        "skill_jaccard": m.jaccard_mat,
+    }
+
+    ranked = rank_candidates_for_jobs(
+        fused_rank_used, m.cv_ids, m.job_ids, top_k, components, score_column="ranking_score",
+    )
+    ranked_det = enrich_detailed(
+        ranked, m.cv_ids, m.job_ids, m.cv_skill_sets, m.job_reqs,
+        cv_years=m.cv_years_list, job_required_years=m.job_req_years,
+        must_cov=m.must_cov, nice_cov=m.nice_cov,
+        semantic_mat=dense_for_components,
+        lex=load_skills_lexicon(resolve_path(root, cfg.get("skills", {}).get("path", "config/skills.yaml"))),
+    )
+
+    # Index lookups for matrix access
+    cv_pos = {str(cid): idx for idx, cid in enumerate(m.cv_ids)}
+    job_pos = {str(jid): idx for idx, jid in enumerate(m.job_ids)}
+
+    renamed = ranked_det.rename(columns={
+        "score_tfidf": "tfidf_score",
+        "score_dense": "semantic_score",
+        "score_skills": "skill_score",
+        "score_experience": "experience_score",
+        "score_bm25": "bm25_score",
+        "score_skill_jaccard": "skill_jaccard",
+    })
+    renamed["final_score_normalized"] = renamed.apply(
+        lambda r: _pair_value(fused_rank_v1, cv_pos, job_pos, r), axis=1
+    )
+
+    if m.bm25_enabled and m.bm25 is not None:
+        fused_raw_v2, _ = fuse_weighted_raw(
+            m.sim_lex, m.dense_sim, m.skill_score, m.exp_mat, weights_v2, m.dense_enabled, bm25=m.bm25
+        )
+        renamed["final_score_v2_bm25"] = renamed.apply(
+            lambda r: _pair_value(fused_raw_v2, cv_pos, job_pos, r), axis=1
+        )
+    else:
+        renamed["final_score_v2_bm25"] = np.nan
+
+    renamed = add_score_audit_columns(
+        renamed, weights,
+        has_semantic=m.dense_enabled, has_bm25=m.bm25_enabled,
+        weights_v2=weights_v2 if m.bm25_enabled else None,
+    )
+    renamed["final_score"] = renamed["final_score_raw"]
+    renamed["score_diff"] = (renamed["final_score"].astype(float) - renamed["score_check"].astype(float)).abs()
+    renamed["score_warning"] = renamed["score_diff"].apply(
+        lambda x: "CHECK>0.01" if float(x) > SCORE_AUDIT_WARN_THRESHOLD else ""
+    )
+
+    # ------------------------------------------------------------------
+    # Optional learned fusion score
+    # ------------------------------------------------------------------
+    lf_path = resolve_path(root, "artifacts/learned_fusion_weights.json")
+    if lf_path.is_file():
+        with open(lf_path, encoding="utf-8") as f:
+            lw = json.load(f)
+        wv = np.array(
+            [float(lw.get(k, 0)) for k in ("tfidf", "semantic", "bm25", "skills", "experience")],
+            dtype=np.float64,
         )
 
-    cvs["clean_text"] = cvs["text"].map(cleaner.clean)
-    jobs["clean_text"] = jobs["text"].map(cleaner.clean)
+        def _lf_row(r: pd.Series) -> float:
+            v = np.array(
+                [float(r.get(k, 0)) for k in ("tfidf_score", "semantic_score", "bm25_score", "skill_score", "experience_score")],
+                dtype=np.float64,
+            )
+            return float((v * wv).sum())
 
-    cv_ids = [str(x) for x in cvs["cv_id"].tolist()]
-    job_ids = [str(x) for x in jobs["job_id"].tolist()]
+        renamed["learned_fusion_score"] = renamed.apply(_lf_row, axis=1)
+    else:
+        renamed["learned_fusion_score"] = np.nan
 
-    cv_skill_sets = [set(s.lower() for s in extract_skills(t)) for t in cvs["text"]]
-    job_skill_sets = [set(s.lower() for s in extract_skills(t)) for t in jobs["text"]]
-    cv_years_list = [cv_max_years(extract_experience_signals(t)) for t in cvs["text"]]
-    job_req_list = [extract_job_required_years(t) for t in jobs["text"]]
+    # Matched / missing skills summary
+    ms: list[str] = []
+    mis: list[str] = []
+    for _, r in renamed.iterrows():
+        i = cv_pos[str(r["cv_id"])]
+        j = job_pos[str(r["job_id"])]
+        cv_s = m.cv_skill_sets[i]
+        job_s = m.job_skill_sets[j]
+        ms.append(";".join(sorted(cv_s & job_s)))
+        mis.append(";".join(sorted(job_s - cv_s)))
+    renamed["matched_skills"] = ms
+    renamed["missing_skills"] = mis
 
-    skills_mat = skill_jaccard_matrix(cv_skill_sets, job_skill_sets)
-    exp_mat = experience_match_matrix(cv_years_list, job_req_list)
-
-    tfidf_cfg = cfg.get("tfidf", {})
-    builder = TfidfFeatureBuilder(tfidf_cfg)
-    corpus = cvs["clean_text"].tolist() + jobs["clean_text"].tolist()
-    builder.fit(corpus)
-    X_cv = builder.transform(cvs["clean_text"].tolist())
-    X_job = builder.transform(jobs["clean_text"].tolist())
-    ensure_parent(feat_model)
-    builder.save(feat_model)
-
-    sim_lex = cosine_pairs(X_cv, X_job)
-
-    emb_cfg = cfg.get("embeddings", {})
-    dense_enabled = bool(semantic and emb_cfg.get("enabled", True))
-    dense_sim = None
-    model = None
-    if dense_enabled:
-        model = try_load_semantic_encoder(emb_cfg.get("model_name", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"))
-        if model is None:
-            dense_enabled = False
-        else:
-            bs = int(emb_cfg.get("batch_size", 32))
-            logger.info("Encoding %d CVs and %d jobs with dense model", len(cvs), len(jobs))
-            e_cv = encode_normalized(model, cvs["clean_text"].tolist(), bs)
-            e_job = encode_normalized(model, jobs["clean_text"].tolist(), bs)
-            dense_sim = dense_cosine_similarity(e_cv, e_job)
-
-    fusion_cfg = cfg.get("fusion", {})
-    weights = dict(fusion_cfg.get("weights", {}))
-    if not weights:
-        # Default split documented in README: balances lexical and semantic
-        # signals with skill / experience as supporting structured channels.
-        weights = {"tfidf": 0.35, "dense": 0.35, "skills": 0.20, "experience": 0.10}
-
-    fused, w_used = fuse_scores(sim_lex, dense_sim, skills_mat, exp_mat, weights, dense_enabled)
-    logger.info("Fusion weights (normalized): %s", w_used)
-
-    top_k = int(cfg.get("matching", {}).get("top_k", 10))
-    components = {"tfidf": sim_lex, "skills": skills_mat, "experience": exp_mat}
-    if dense_sim is not None:
-        components["dense"] = dense_sim
-
-    ranked = rank_candidates_for_jobs(fused, cv_ids, job_ids, top_k, components)
-    ranked = enrich_with_explanations(
-        ranked,
-        cv_ids,
-        job_ids,
-        cv_skill_sets,
-        job_skill_sets,
-        cv_years_list,
-        job_req_list,
-    )
-
+    # ------------------------------------------------------------------
+    # Write output files
+    # ------------------------------------------------------------------
     ensure_parent(out_rank)
-    ranked_out = ranked.drop(
-        columns=["matched_skills", "missing_skills", "experience_note"],
+    ranked_simple = renamed.copy()
+    ranked_simple["score"] = ranked_simple["ranking_score"]
+    ranked_simple = ranked_simple.drop(
+        columns=["matched_skills", "missing_skills", "experience_note", "explanation", "suggested_improvements", "ranking_score"],
         errors="ignore",
     )
-    ranked_out.to_csv(out_rank, index=False)
+    if "final_score" not in ranked_simple.columns:
+        ranked_simple["final_score"] = renamed["final_score"]
+    ranked_simple.to_csv(out_rank, index=False)
 
     if cfg.get("pipeline", {}).get("write_explanations", True):
         ensure_parent(explain_path)
-        explained = ranked.rename(
-            columns={
-                "score": "final_score",
-                "score_tfidf": "tfidf_score",
-                "score_dense": "semantic_score",
-                "score_skills": "skill_score",
-                "score_experience": "experience_score",
-                "experience_note": "explanation",
-            }
-        )
-        if "semantic_score" not in explained.columns:
-            explained["semantic_score"] = 0.0
         preferred = [
-            "job_id",
-            "cv_id",
-            "rank_for_job",
-            "tfidf_score",
-            "semantic_score",
-            "skill_score",
-            "experience_score",
-            "final_score",
-            "matched_skills",
-            "missing_skills",
-            "explanation",
+            "job_id", "cv_id", "rank_for_job", "ranking_score",
+            "tfidf_score", "semantic_score", "bm25_score", "skill_jaccard", "skill_score", "experience_score",
+            "must_have_coverage", "nice_to_have_coverage",
+            "matched_required_skills", "missing_critical_skills", "matched_optional_skills", "missing_optional_skills",
+            "cv_years_experience", "job_min_years_experience",
+            "final_score_raw", "final_score_normalized", "final_score", "final_score_v2_bm25", "learned_fusion_score",
+            "score_check", "score_diff", "score_warning",
+            "matched_skills", "missing_skills", "explanation", "suggested_improvements",
         ]
-        ordered = [c for c in preferred if c in explained.columns]
-        explained = explained[ordered + [c for c in explained.columns if c not in ordered]]
+        ordered = [c for c in preferred if c in renamed.columns]
+        explained = renamed[ordered + [c for c in renamed.columns if c not in ordered]]
         explained.to_csv(explain_path, index=False)
         logger.info("Wrote explainable rankings: %s", explain_path)
 
+    # ------------------------------------------------------------------
+    # Offline evaluation
+    # ------------------------------------------------------------------
     metrics: dict[str, float] = {}
     gt_path = paths.get("ground_truth")
     run_eval = bool(evaluate) if evaluate is not None else True
@@ -221,12 +333,15 @@ def run_full_pipeline(
             gt = validate_ground_truth_df(pd.read_csv(gt_file))
             eval_cfg = cfg.get("evaluation", {})
             ks = eval_cfg.get("top_k_values", [1, 3, 5])
+            ranked_eval = renamed.copy()
+            ranked_eval["score"] = ranked_eval["ranking_score"]
             for k in ks:
-                metrics[f"topk_hit_rate_{k}"] = float(top_k_accuracy(ranked_out, gt, int(k)))
-                metrics[f"precision_at_{k}"] = float(precision_at_k(ranked_out, gt, int(k)))
-                metrics[f"ndcg_at_{k}"] = float(ndcg_at_k(ranked_out, gt, int(k)))
-            metrics["mrr"] = float(mean_reciprocal_rank(ranked_out, gt))
-            metrics["map"] = float(mean_average_precision(ranked_out, gt))
+                metrics[f"topk_hit_rate_{k}"] = float(top_k_accuracy(ranked_eval, gt, int(k)))
+                metrics[f"precision_at_{k}"] = float(precision_at_k(ranked_eval, gt, int(k)))
+                metrics[f"recall_at_{k}"] = float(recall_at_k(ranked_eval, gt, int(k)))
+                metrics[f"ndcg_at_{k}"] = float(ndcg_at_k(ranked_eval, gt, int(k)))
+            metrics["mrr"] = float(mean_reciprocal_rank(ranked_eval, gt))
+            metrics["map"] = float(mean_average_precision(ranked_eval, gt))
             for k, v in metrics.items():
                 logger.info("%s: %.4f", k, v)
         elif evaluate:
@@ -237,6 +352,9 @@ def run_full_pipeline(
         else:
             logger.info("Ground truth missing at %s — skipping metrics.", gt_file)
 
+    # ------------------------------------------------------------------
+    # Run manifest
+    # ------------------------------------------------------------------
     artifact_paths = {
         "input_cvs": str(proc_cvs),
         "input_jobs": str(proc_jobs),
@@ -248,11 +366,8 @@ def run_full_pipeline(
 
     if cfg.get("experiment", {}).get("write_manifest", True):
         write_run_manifest(
-            root,
-            cfg,
-            artifact_paths,
-            metrics,
-            notes="dense_enabled=%s" % dense_enabled,
+            root, cfg, artifact_paths, metrics,
+            notes=json.dumps({"dense_enabled": m.dense_enabled, "bm25_enabled": m.bm25_enabled}),
         )
 
     logger.info("Wrote rankings: %s", out_rank)

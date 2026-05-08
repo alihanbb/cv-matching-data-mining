@@ -1,0 +1,207 @@
+# Canonical skills with categories and multi-token aliases (matched case-insensitively).
+# Aliases expand to canonical_skill_id used in extraction and coverage metrics.
+
+categories:
+  language: [python, java, javascript, typescript, csharp, go, rust, r_lang, sql]
+  ml_data: [pandas, numpy, scikit_learn, tensorflow, pytorch, spark, kafka, nlp]
+  cloud_devops: [docker, kubernetes, aws, azure, gcp, cicd, ansible, terraform]
+  web: [react, node, angular, vue, django, flask, fastapi]
+  data_viz: [tableau, power_bi, excel]
+  database: [postgresql, mongodb, redis, elasticsearch]
+  other: [git, linux, agile, scrum, etl, deep_learning, machine_learning, data_mining]
+
+skills:
+  python:
+    category: language
+    display: Python
+    aliases: [py, python3]
+  java:
+    category: language
+    display: Java
+    aliases: []
+  javascript:
+    category: language
+    display: JavaScript
+    aliases: [js]
+  typescript:
+    category: language
+    display: TypeScript
+    aliases: [ts]
+  csharp:
+    category: language
+    display: "C#"
+    aliases: [c sharp, c#, .net, dotnet, dotnetcore, asp.net]
+  go:
+    category: language
+    display: Go
+    aliases: [golang]
+  rust:
+    category: language
+    display: Rust
+    aliases: []
+  r_lang:
+    category: language
+    display: R
+    aliases: [r programming, rstudio, "language r"]
+  sql:
+    category: language
+    display: SQL
+    aliases: [t-sql, mysql syntax]
+
+  pandas:
+    category: ml_data
+    display: Pandas
+    aliases: []
+  numpy:
+    category: ml_data
+    display: NumPy
+    aliases: []
+  scikit_learn:
+    category: ml_data
+    display: scikit-learn
+    aliases: [sklearn, scikit learn]
+  tensorflow:
+    category: ml_data
+    display: TensorFlow
+    aliases: [tf]
+  pytorch:
+    category: ml_data
+    display: PyTorch
+    aliases: [torch]
+  spark:
+    category: ml_data
+    display: Apache Spark
+    aliases: [apache spark]
+  kafka:
+    category: ml_data
+    display: Kafka
+    aliases: [apache kafka]
+  nlp:
+    category: ml_data
+    display: NLP
+    aliases: [natural language processing]
+  machine_learning:
+    category: ml_data
+    display: Machine Learning
+    aliases: [ml]
+  deep_learning:
+    category: ml_data
+    display: Deep Learning
+    aliases: [dl]
+  data_mining:
+    category: ml_data
+    display: Data Mining
+    aliases: []
+
+  docker:
+    category: cloud_devops
+    display: Docker
+    aliases: []
+  kubernetes:
+    category: cloud_devops
+    display: Kubernetes
+    aliases: [k8s, kube]
+  aws:
+    category: cloud_devops
+    display: AWS
+    aliases: [amazon web services]
+  azure:
+    category: cloud_devops
+    display: Azure
+    aliases: []
+  gcp:
+    category: cloud_devops
+    display: GCP
+    aliases: [google cloud]
+  cicd:
+    category: cloud_devops
+    display: CI/CD
+    aliases: [ci cd, ci/cd, continuous integration, continuous deployment]
+  ansible:
+    category: cloud_devops
+    display: Ansible
+    aliases: []
+  terraform:
+    category: cloud_devops
+    display: Terraform
+    aliases: []
+
+  react:
+    category: web
+    display: React
+    aliases: [reactjs]
+  node:
+    category: web
+    display: Node.js
+    aliases: [node.js, nodejs]
+  angular:
+    category: web
+    display: Angular
+    aliases: []
+  vue:
+    category: web
+    display: Vue
+    aliases: [vuejs]
+  django:
+    category: web
+    display: Django
+    aliases: []
+  flask:
+    category: web
+    display: Flask
+    aliases: []
+  fastapi:
+    category: web
+    display: FastAPI
+    aliases: []
+
+  tableau:
+    category: data_viz
+    display: Tableau
+    aliases: []
+  power_bi:
+    category: data_viz
+    display: Power BI
+    aliases: [powerbi]
+  excel:
+    category: data_viz
+    display: Excel
+    aliases: [ms excel]
+
+  postgresql:
+    category: database
+    display: PostgreSQL
+    aliases: [postgres, psql]
+  mongodb:
+    category: database
+    display: MongoDB
+    aliases: [mongo]
+  redis:
+    category: database
+    display: Redis
+    aliases: []
+  elasticsearch:
+    category: database
+    display: Elasticsearch
+    aliases: [elastic]
+
+  git:
+    category: other
+    display: Git
+    aliases: [github, gitlab]
+  linux:
+    category: other
+    display: Linux
+    aliases: [unix]
+  agile:
+    category: other
+    display: Agile
+    aliases: []
+  scrum:
+    category: other
+    display: Scrum
+    aliases: []
+  etl:
+    category: other
+    display: ETL
+    aliases: []

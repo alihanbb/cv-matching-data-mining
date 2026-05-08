@@ -50,12 +50,14 @@ Veri içinden işe yarar sinyaller çıkarılır.
 
 | Sinyal        | Yöntem                                                | Çıktı                                 |
 | ------------- | ----------------------------------------------------- | ------------------------------------- |
-| Beceri kümesi | Lexicon + alias normalizasyonu (Python, ML, k8s, ...) | CV ve ilan için `set[str]`            |
-| Deneyim yılı  | Regex tabanlı yıl ifadeleri                           | CV maks. yıl, ilan minimum gereksinim |
+| Beceri kümesi | `config/skills.yaml` lexicon + alias | CV ve ilan için kanonik `skill_id` kümesi |
+| İlan gereksinimleri | Başlık anahtar kelimeleri (must / nice, TR/EN) | `must_have` / `nice_to_have` kümeleri |
+| Kapsam skoru | İstenen becerilere göre \|eşleşme\| / \|gerekli\| | `skill_score` kanalı |
+| Deneyim yılı  | Regex tabanlı yıl ifadeleri (EN/TR)            | CV maks. yıl, ilan minimum gereksinim     |
 | Rol ipuçları  | Regex (junior, senior, lead, ...)                     | İsteğe bağlı bağlam sinyali           |
 
 
-İlgili modüller: `src/extraction/skill_extractor.py`, `src/extraction/experience_extractor.py`.
+İlgili modüller: `src/extraction/skill_extractor.py`, `src/extraction/skills_lexicon.py`, `src/extraction/requirements_extractor.py`, `src/extraction/experience_extractor.py`.
 
 Bu adım, "ham metin → yapılandırılmış sinyal" geçişini sağlar ve sonraki skor kanalları için temel oluşturur.
 
@@ -63,19 +65,13 @@ Bu adım, "ham metin → yapılandırılmış sinyal" geçişini sağlar ve sonr
 
 ## 4. Özellik Çıkarımı (Feature Extraction)
 
-Hesaplanan dört kanal:
+Hesaplanan kanallar:
 
 1. **Lexical (TF-IDF)** — `src/features/tfidf_vectorizer.py`
-  - 1–2-gram, sublinear TF, IDF.
-  - CV ve ilan tek vektörleyici ile fit edilir.
-2. **Semantic (Dense Embedding)** — `src/features/semantic_encoder.py`
-  - Çok dilli `paraphrase-multilingual-MiniLM-L12-v2`.
-  - L2-normalize edilmiş vektörler ile cosine similarity.
-  - Paket / model yoksa kanal otomatik kapanır.
-3. **Skill (Jaccard)** — `src/scoring/fusion.py::skill_jaccard_matrix`
-  - `|intersection| / |union|`.
-4. **Experience** — `src/scoring/fusion.py::experience_match_matrix`
-  - `cv_years >= job_required` ise 1.0; daha azsa oranlı; bilinmiyorsa 1.0 (cezalandırmama).
+2. **Semantic (SBERT)** — `src/features/semantic_encoder.py`
+3. **BM25 (opsiyonel)** — `src/features/bm25_scorer.py` (`rank-bm25`)
+4. **Skill** — gereksinim kapsamı + raporlama için Jaccard (`src/scoring/fusion.py`)
+5. **Experience** — `src/scoring/fusion.py::experience_match_matrix`
 
 ---
 

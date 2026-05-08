@@ -6,6 +6,7 @@ from pathlib import Path
 from src.utils.helpers import load_config, project_root, resolve_path
 
 from .build_processed import build_processed_from_raw
+from .cv_corpus import extra_cvs_from_ingest_config
 
 
 def main() -> None:
@@ -21,8 +22,14 @@ def main() -> None:
     paths = cfg["paths"]
     out_cvs = resolve_path(root, paths["processed_cvs"])
     out_jobs = resolve_path(root, paths["processed_jobs"])
-    n_cv, n_job = build_processed_from_raw(raw_cvs, raw_jobs, out_cvs, out_jobs)
-    print(f"Ingest complete: {n_cv} CV rows → {out_cvs}, {n_job} job rows → {out_jobs}")
+    extra = extra_cvs_from_ingest_config(root, ing)
+    n_bronze, n_corpus, n_job = build_processed_from_raw(
+        raw_cvs, raw_jobs, out_cvs, out_jobs, extra_cv_rows=extra or None
+    )
+    print(
+        f"Ingest complete: {n_bronze} bronze + {n_corpus} corpus = {n_bronze + n_corpus} CV rows → {out_cvs}, "
+        f"{n_job} job rows → {out_jobs}"
+    )
 
 
 if __name__ == "__main__":

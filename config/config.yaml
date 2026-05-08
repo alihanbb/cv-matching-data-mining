@@ -6,9 +6,27 @@ paths:
   output_explanations: data/gold/rankings/candidate_scores_explained.csv
   ground_truth: data/evaluation/ground_truth.csv
 
+skills:
+  path: config/skills.yaml
+
 ingest:
   raw_cvs_dir: data/bronze/cvs
   raw_jobs_dir: data/bronze/job_descriptions
+  # Gerçek CV korpusunu JSONL’den ekler; ilanlar yalnızca raw_jobs_dir (bronze job txt’ler).
+  cv_corpus_jsonl:
+    enabled: true
+    path: data/silver/unified_resumes.jsonl
+    id_field: record_id
+    text_field: text
+    id_prefix: corpus_
+    max_rows: 4000
+
+silver:
+  unified_resumes: data/silver/unified_resumes.jsonl
+  write_unified_resumes: false
+
+privacy:
+  anonymize: true
 
 preprocessing:
   language: en
@@ -26,12 +44,23 @@ embeddings:
   enabled: true
   model_name: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
   batch_size: 32
+  device: null
+
+bm25:
+  enabled: true
 
 fusion:
-  # Final score = 0.35*tfidf + 0.35*dense(semantic) + 0.20*skills + 0.10*experience
   weights:
     tfidf: 0.35
     dense: 0.35
+    skills: 0.20
+    experience: 0.10
+
+fusion_v2:
+  weights:
+    tfidf: 0.25
+    dense: 0.25
+    bm25: 0.20
     skills: 0.20
     experience: 0.10
 

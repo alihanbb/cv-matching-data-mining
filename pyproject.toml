@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cv-matching-data-mining"
-version = "0.2.0"
-description = "CV–job matching with TF-IDF, optional dense embeddings, and structured skill/experience fusion"
+version = "0.3.0"
+description = "CV–job matching with TF-IDF, BM25, SBERT, requirement coverage, and explainable hybrid fusion"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -21,10 +21,12 @@ dependencies = [
 
 [project.optional-dependencies]
 semantic = ["sentence-transformers>=2.2.0", "torch>=2.0.0"]
+bm25 = ["rank-bm25>=0.2.2"]
 dashboard = ["streamlit>=1.30.0", "matplotlib>=3.7.0"]
+training = ["torch>=2.0.0"]
+data_imports = ["datasets>=2.14.0", "huggingface_hub>=0.20.0"]
+kaggle_import = ["kaggle>=1.6.0"]
 dev = ["pytest>=7.4.0"]
-
-[tool.setuptools.packages.find]
 where = ["."]
 include = ["src*"]
 
