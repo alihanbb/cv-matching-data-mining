@@ -92,6 +92,11 @@ python main.py --evaluate
 
 Import tamamlandıktan sonra tüm rutin kullanım **Bronze JSONL ve Silver tablolar** üzerindendir.
 
+> **External repositories are required only during import.**
+> After Bronze JSONL files are generated, the runtime pipeline reads only the
+> project's standardized Bronze layer (`data/bronze/`). External repo folders
+> can be removed or kept outside the project directory.
+
 ## Baseline model: TF-IDF + Cosine Similarity
 
 - 1–2-gram, sublinear TF.

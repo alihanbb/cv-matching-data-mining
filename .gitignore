@@ -14,10 +14,10 @@ data/gold/**/*.csv
 data/gold/**/*.pkl
 data/bronze/**/*.jsonl
 
-# Binary or archive inputs often copied into bronze
-data/**/*.docx
-data/**/*.pdf
-data/**/*.zip
+# Binary or archive inputs — anywhere in the project (test fixtures are tracked explicitly)
+*.docx
+*.pdf
+*.zip
 
 # -----------------------------------------------------------------------------
 # Python bytecode
