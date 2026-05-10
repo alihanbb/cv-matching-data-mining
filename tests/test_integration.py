@@ -175,10 +175,10 @@ class TestIngestStep:
 
         cvs = pd.read_csv(cv_out)
         jobs = pd.read_csv(job_out)
-        assert "cv_id" in cvs.columns
-        assert "text" in cvs.columns
-        assert "job_id" in jobs.columns
-        assert "text" in jobs.columns
+        for col in ("cv_id", "raw_text", "text"):
+            assert col in cvs.columns
+        for col in ("job_id", "raw_text", "text"):
+            assert col in jobs.columns
         assert len(cvs) == len(_CV_TEXTS)
         assert len(jobs) == len(_JOB_TEXTS)
         # No empty text cells

@@ -12,14 +12,17 @@ skills:
 ingest:
   raw_cvs_dir: data/bronze/cvs
   raw_jobs_dir: data/bronze/job_descriptions
-  # Gerçek CV korpusunu JSONL’den ekler; ilanlar yalnızca raw_jobs_dir (bronze job txt’ler).
+  bronze_resumes_jsonl: data/bronze/resumes/resumes_bronze.jsonl
+  bronze_jobs_jsonl: data/bronze/jobs/jobs_bronze.jsonl
+  # Non-empty list restricts CV rows loaded from Bronze JSONL / optional corpus JSONL to these ``source`` tags.
+  ranking_sources: []
   cv_corpus_jsonl:
     enabled: true
     path: data/silver/unified_resumes.jsonl
     id_field: record_id
     text_field: text
     id_prefix: corpus_
-    max_rows: 4000
+    max_rows: 12000
 
 silver:
   unified_resumes: data/silver/unified_resumes.jsonl

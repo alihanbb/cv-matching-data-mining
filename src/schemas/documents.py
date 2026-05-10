@@ -46,15 +46,17 @@ def validate_processed_df(df: pd.DataFrame, id_col: str, text_col: str) -> pd.Da
 def validate_ground_truth_df(df: pd.DataFrame) -> pd.DataFrame:
     """Validate a ground-truth DataFrame.
 
-    Accepts either ``relevant`` or the user-facing ``relevance`` column name;
-    the returned DataFrame always normalizes to ``relevant``.
+    Accepts either ``relevant`` or ``relevance``; ``resume_id`` is accepted as alias
+    of ``cv_id``. The returned frame always exposes ``cv_id`` and ``relevant``.
     """
     df = df.copy()
+    if "cv_id" not in df.columns and "resume_id" in df.columns:
+        df = df.rename(columns={"resume_id": "cv_id"})
     if "relevant" not in df.columns and "relevance" in df.columns:
         df = df.rename(columns={"relevance": "relevant"})
     for c in ("cv_id", "job_id", "relevant"):
         if c not in df.columns:
-            raise ValueError(f"Ground truth must have column {c}")
+            raise ValueError(f"Ground truth must have column {c} (or resume_id alias for cv_id)")
     rows: list[dict] = []
     for _, r in df.iterrows():
         gr = GroundTruthRow(cv_id=str(r["cv_id"]), job_id=str(r["job_id"]), relevant=int(r["relevant"]))

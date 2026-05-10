@@ -112,8 +112,16 @@ def build_matching_matrices(
         language=pre.get("language", "en"),
     )
 
-    cvs = validate_processed_df(read_processed_csv(proc_cvs, "cv_id"), "cv_id", "text")
-    jobs = validate_processed_df(read_processed_csv(proc_jobs, "job_id"), "job_id", "text")
+    raw_cvs = read_processed_csv(proc_cvs, "cv_id")
+    raw_jobs = read_processed_csv(proc_jobs, "job_id")
+    cv_text_col = "raw_text" if "raw_text" in raw_cvs.columns else "text"
+    job_text_col = "raw_text" if "raw_text" in raw_jobs.columns else "text"
+    cvs = validate_processed_df(raw_cvs, "cv_id", cv_text_col)
+    jobs = validate_processed_df(raw_jobs, "job_id", job_text_col)
+    if cv_text_col != "text":
+        cvs = cvs.rename(columns={cv_text_col: "text"})
+    if job_text_col != "text":
+        jobs = jobs.rename(columns={job_text_col: "text"})
     if cvs.empty or jobs.empty:
         raise ValueError("Processed CV or job tables are empty — run ingest first.")
 

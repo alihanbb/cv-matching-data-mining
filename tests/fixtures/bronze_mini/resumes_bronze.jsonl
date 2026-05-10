@@ -1,0 +1,1 @@
+{"resume_id": "test_cv_001", "source": "fixture", "source_file": "x.txt", "raw_text": "Python developer with five years experience.", "language": "en", "labels": {"entities": [{"start": 0, "end": 6, "label": "SKILL", "text": "Python"}]}, "metadata": {"original_format": "txt", "category": null}}

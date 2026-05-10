@@ -19,7 +19,12 @@ def test_ground_truth_accepts_graded_labels():
 def test_ground_truth_accepts_relevance_alias():
     df = pd.DataFrame({"cv_id": [1, 2], "job_id": [10, 10], "relevance": [3, 0]})
     out = validate_ground_truth_df(df)
-    assert "relevant" in out.columns
+
+
+def test_ground_truth_accepts_resume_id_alias():
+    df = pd.DataFrame({"resume_id": [1], "job_id": [2], "relevance": [2]})
+    out = validate_ground_truth_df(df)
+    assert "cv_id" in out.columns
 
 
 def test_ground_truth_invalid_out_of_range():

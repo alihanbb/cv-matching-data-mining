@@ -8,6 +8,10 @@ env/
 *.egg-info/
 dist/
 build/
-data/gold/models/*.pkl
+data/bronze/
+data/silver/
+*.docx
+*.pdf
+*.zip
 artifacts/runs/
 .DS_Store

@@ -127,8 +127,16 @@ def run_full_pipeline(
         raw_cvs = resolve_path(root, ing.get("raw_cvs_dir", "data/bronze/cvs"))
         raw_jobs = resolve_path(root, ing.get("raw_jobs_dir", "data/bronze/job_descriptions"))
         extra_cv = extra_cvs_from_ingest_config(root, ing)
+        pre = cfg.get("preprocessing", {})
         n_bronze, n_corpus, n_job = build_processed_from_raw(
-            raw_cvs, raw_jobs, proc_cvs, proc_jobs, extra_cv_rows=extra_cv or None
+            raw_cvs,
+            raw_jobs,
+            proc_cvs,
+            proc_jobs,
+            root=root,
+            ingest_cfg=ing,
+            preprocessor_cfg=pre,
+            extra_cv_rows=extra_cv or None,
         )
         logger.info(
             "Ingest: %d bronze CV files + %d JSONL corpus rows → %d total CV rows; %d job files → Silver",
@@ -166,7 +174,9 @@ def run_full_pipeline(
         privacy = cfg.get("privacy", {})
         anonymize = bool(privacy.get("anonymize", True))
         # Load raw CVs from silver CSV (before clean_text) for JSONL output
-        raw_cvs_df = validate_processed_df(read_processed_csv(proc_cvs, "cv_id"), "cv_id", "text")
+        raw_full = read_processed_csv(proc_cvs, "cv_id")
+        uc = "raw_text" if "raw_text" in raw_full.columns else "text"
+        raw_cvs_df = validate_processed_df(raw_full, "cv_id", uc)
         _maybe_unified_jsonl(root, raw_cvs_df, lex, cleaner, unified_path, anonymize=anonymize)
 
     # ------------------------------------------------------------------

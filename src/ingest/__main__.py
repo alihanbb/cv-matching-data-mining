@@ -23,8 +23,16 @@ def main() -> None:
     out_cvs = resolve_path(root, paths["processed_cvs"])
     out_jobs = resolve_path(root, paths["processed_jobs"])
     extra = extra_cvs_from_ingest_config(root, ing)
+    pre = cfg.get("preprocessing", {})
     n_bronze, n_corpus, n_job = build_processed_from_raw(
-        raw_cvs, raw_jobs, out_cvs, out_jobs, extra_cv_rows=extra or None
+        raw_cvs,
+        raw_jobs,
+        out_cvs,
+        out_jobs,
+        root=root,
+        ingest_cfg=ing,
+        preprocessor_cfg=pre,
+        extra_cv_rows=extra or None,
     )
     print(
         f"Ingest complete: {n_bronze} bronze + {n_corpus} corpus = {n_bronze + n_corpus} CV rows → {out_cvs}, "

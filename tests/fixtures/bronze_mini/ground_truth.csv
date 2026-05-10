@@ -1,0 +1,2 @@
+job_id,resume_id,relevance,source
+test_job_001,test_cv_001,2,fixture

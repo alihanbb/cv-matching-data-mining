@@ -42,13 +42,36 @@ Detay: [docs/RAPOR.md](docs/RAPOR.md), diyagram: [docs/PIPELINE_DIAGRAM.md](docs
 
 | Katman | Dizin | İçerik |
 |---|---|---|
-| **Bronze** (ham) | `data/bronze/cvs/`, `data/bronze/job_descriptions/` | Orijinal dosyalar (PDF / DOCX / TXT / MD). Hiç değiştirilmez. |
-| **Silver** (temiz) | `data/silver/cleaned_cvs.csv`, `data/silver/cleaned_jobs.csv`, `data/silver/unified_resumes.jsonl` | Normalize tablo + canonical JSONL. |
+| **Bronze** (ham) | `data/bronze/resumes/resumes_bronze.jsonl`, `data/bronze/jobs/jobs_bronze.jsonl` _(tercih edilen)_ veya klasör ingest: `data/bronze/cvs/`, `data/bronze/job_descriptions/` | Orijinal içerik; JSONL pipeline için kanonik forma dönüştürülmüş satırlar. |
+| **Silver** (temiz) | `data/silver/cleaned_cvs.csv`, `data/silver/cleaned_jobs.csv`, `data/silver/unified_resumes.jsonl` | Normalize tablo; CV’lerde `cv_id` (Bronze `resume_id`), `raw_text`, `cleaned_text`, skorlama için `text`. |
 | **Gold** (model + sonuç) | `data/gold/models/tfidf_model.pkl`, `data/gold/rankings/candidate_scores.csv`, `data/gold/rankings/candidate_scores_explained.csv` | Eğitilmiş özellikler ve sıralama çıktıları. |
 | **Etiketler** | `data/evaluation/ground_truth.csv` | Dereceli relevans (0–3), offline değerlendirme. |
 | **İz / Manifest** | `artifacts/runs/<UTC>/manifest.json` | Config özeti, artifact yolları, metrikler. |
 
----
+## External Dataset Import
+
+Bu proje, dış CV/NER veri kaynaklarını doğrudan proje bağımlılığı yapmaz. Aynı üst dizine klonlanan repolardaki veriler tek seferlik import scripti ile standart Bronze JSONL formatına dönüştürülür.
+
+| Source | Purpose | Output |
+|---|---|---|
+| NLP_NER_ON_RESUME | Structured resume parsing reference | `resumes_bronze.jsonl` |
+| Entity-Recognition-In-Resumes-SpaCy | Resume NER annotations | `resumes_bronze.jsonl`, `ner_annotations_bronze.jsonl` |
+| vacancy-resume-matching-dataset | CV–job matching / evaluation | `resumes_bronze.jsonl`, `jobs_bronze.jsonl`, `ground_truth.csv` (veya template) |
+| NER-Annotated-CVs | Skill/entity annotations | `resumes_bronze.jsonl`, `ner_annotations_bronze.jsonl` |
+
+```bash
+python scripts/import_external_repos_to_bronze.py --source-root .. --all --overwrite
+```
+
+Import sonrası (dış repoları silebilirsiniz):
+
+```bash
+python main.py --ingest
+python main.py --semantic --bm25
+python main.py --evaluate
+```
+
+Dış veri repoları yalnızca import aşamasında gereklidir. Veriler Bronze JSONL’e alındıktan sonra proje kendi standart veri katmanı üzerinden çalışır.
 
 ## Baseline model: TF-IDF + Cosine Similarity
 

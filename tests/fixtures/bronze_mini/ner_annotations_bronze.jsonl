@@ -1,0 +1,1 @@
+{"annotation_id": "ann_001", "source": "fixture", "source_file": "a.json", "text": "Python skills", "entities": [{"start": 0, "end": 6, "label": "SKILL", "text": "Python"}], "metadata": {"original_format": "json"}}
