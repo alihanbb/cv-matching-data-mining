@@ -33,6 +33,7 @@ from src.preprocessing.pii import anonymize_text
 from src.schemas.documents import validate_processed_df
 from src.scoring.fusion import experience_match_matrix, skill_jaccard_matrix
 from src.utils.helpers import resolve_path
+from src.utils.id_normalization import normalize_cv_id, normalize_job_id
 from sklearn.metrics.pairwise import cosine_similarity
 
 logger = logging.getLogger(__name__)
@@ -124,6 +125,21 @@ def build_matching_matrices(
 
     raw_cvs = read_processed_csv(proc_cvs, "cv_id")
     raw_jobs = read_processed_csv(proc_jobs, "job_id")
+    raw_cvs = raw_cvs.copy()
+    raw_jobs = raw_jobs.copy()
+    raw_cvs["cv_id"] = raw_cvs["cv_id"].map(normalize_cv_id)
+    raw_jobs["job_id"] = raw_jobs["job_id"].map(normalize_job_id)
+    raw_cvs = raw_cvs[raw_cvs["cv_id"] != ""]
+    raw_jobs = raw_jobs[raw_jobs["job_id"] != ""]
+    dup_cv = int(raw_cvs["cv_id"].duplicated().sum())
+    dup_job = int(raw_jobs["job_id"].duplicated().sum())
+    if dup_cv:
+        logger.warning("Processed CV table has %d duplicate canonical cv_id rows; keeping first.", dup_cv)
+        raw_cvs = raw_cvs.drop_duplicates(subset=["cv_id"], keep="first")
+    if dup_job:
+        logger.warning("Processed job table has %d duplicate canonical job_id rows; keeping first.", dup_job)
+        raw_jobs = raw_jobs.drop_duplicates(subset=["job_id"], keep="first")
+
     cv_text_col = "raw_text" if "raw_text" in raw_cvs.columns else "text"
     job_text_col = "raw_text" if "raw_text" in raw_jobs.columns else "text"
     cvs = validate_processed_df(raw_cvs, "cv_id", cv_text_col)

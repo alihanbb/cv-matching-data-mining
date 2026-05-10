@@ -23,6 +23,7 @@ from src.processing.cv_sections import (
     write_unified_resumes_jsonl,
 )
 from src.utils.helpers import ensure_parent, resolve_path
+from src.utils.id_normalization import normalize_cv_id, normalize_job_id
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ def _dedupe_cv_first(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], 
     out: list[dict[str, Any]] = []
     dropped = 0
     for r in rows:
-        cid = str(r.get("cv_id", "") or "").strip()
+        cid = normalize_cv_id(r.get("cv_id", "") or "")
         if not cid:
             continue
         if cid in seen:
@@ -50,7 +51,7 @@ def _dedupe_jobs_first(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]]
     out: list[dict[str, Any]] = []
     dropped = 0
     for r in rows:
-        jid = str(r.get("job_id", "") or "").strip()
+        jid = normalize_job_id(r.get("job_id", "") or "")
         if not jid:
             continue
         if jid in seen:
@@ -68,7 +69,7 @@ def _cv_bundles(
     cleaner: TextCleaner,
     anonymize_docs: bool,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    cid = str(row["cv_id"])
+    cid = normalize_cv_id(row["cv_id"])
     raw_base = str(row.get("raw_text", "") or "")
     src = str(row.get("source", "") or "").strip()
     sfile = str(row.get("source_file", "") or "").strip()
@@ -120,7 +121,7 @@ def _job_bundles(
     cleaner: TextCleaner,
     anonymize_docs: bool,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    jid = str(row["job_id"])
+    jid = normalize_job_id(row["job_id"])
     raw_base = str(row.get("raw_text", "") or "")
     anon_text = anonymize_text(raw_base) if anonymize_docs else raw_base
     cleaned = cleaner.clean(anon_text)
@@ -251,6 +252,7 @@ def read_cv_quality_scores(path: Path) -> dict[str, float]:
             except json.JSONDecodeError:
                 continue
             cid = str(obj.get("cv_id", "") or "").strip()
+            cid = normalize_cv_id(cid)
             if not cid:
                 continue
             try:

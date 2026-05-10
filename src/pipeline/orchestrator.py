@@ -35,6 +35,7 @@ from src.scoring.score_audit import weighted_fusion_v1_row
 from src.silver.build import read_cv_quality_scores
 from src.utils.experiment import write_run_manifest
 from src.utils.helpers import ensure_parent, resolve_path
+from src.utils.id_normalization import normalize_cv_id, normalize_job_id
 from sklearn.metrics.pairwise import cosine_similarity
 
 logger = logging.getLogger(__name__)
@@ -305,6 +306,9 @@ def run_full_pipeline(
             "score_skill_jaccard": "skill_jaccard_score",
         }
     )
+    renamed["cv_id"] = renamed["cv_id"].map(normalize_cv_id)
+    renamed["job_id"] = renamed["job_id"].map(normalize_job_id)
+    renamed = renamed[(renamed["cv_id"] != "") & (renamed["job_id"] != "")]
     renamed["fusion_minmax_normalized_v1"] = renamed.apply(
         lambda r: _pair_value(fused_rank_v1, cv_pos, job_pos, r), axis=1
     )
@@ -328,9 +332,10 @@ def run_full_pipeline(
     ).astype(float)
     renamed["score_check"] = row_chk
     renamed["final_score"] = renamed["final_score_v1"]
-    renamed["score_diff"] = (
+    raw_score_diff = (
         renamed["final_score_v1"].astype(float) - renamed["score_check"].astype(float)
     ).abs()
+    renamed["score_diff"] = raw_score_diff.where(raw_score_diff > 1e-9, 0.0)
     renamed["score_warning"] = renamed["score_diff"].apply(
         lambda x: "CHECK>0.01" if float(x) > SCORE_AUDIT_WARN_THRESHOLD else ""
     )
@@ -359,6 +364,14 @@ def run_full_pipeline(
         renamed["source"] = renamed["cv_id"].map(lambda x: str(src_series.get(x, "") or ""))
     else:
         renamed["source"] = ""
+
+    # Guarantee one canonical candidate per (job_id, cv_id) and recompute rank.
+    if not renamed.empty:
+        renamed = renamed.sort_values(
+            by=["job_id", "ranking_score", "cv_id"], ascending=[True, False, True], kind="mergesort"
+        )
+        renamed = renamed.drop_duplicates(subset=["job_id", "cv_id"], keep="first")
+        renamed["rank_for_job"] = renamed.groupby("job_id").cumcount() + 1
 
     # ------------------------------------------------------------------
     # Optional learned fusion score

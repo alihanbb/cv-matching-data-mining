@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from src.utils.helpers import resolve_path
+from src.utils.id_normalization import normalize_cv_id
 
 logger = logging.getLogger(__name__)
 
@@ -64,8 +65,12 @@ def load_cv_rows_from_jsonl(
             stext = str(text).strip() if text is not None else ""
             if len(stext) < 40:
                 continue
-            rid = str(raw_id).strip()
-            cid = f"{id_prefix}{rid}" if id_prefix else rid
+            rid = normalize_cv_id(raw_id)
+            if not rid:
+                continue
+            cid = normalize_cv_id(f"{id_prefix}{rid}" if id_prefix else rid)
+            if not cid:
+                continue
             sfile = str(obj.get("source_file", "") or "").strip()
             sour = str(obj.get("source", "") or "").strip()
             rows.append({"cv_id": cid, "text": stext, "source": sour, "source_file": sfile})

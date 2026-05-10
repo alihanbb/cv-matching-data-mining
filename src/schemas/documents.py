@@ -3,6 +3,8 @@ from __future__ import annotations
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from src.utils.id_normalization import normalize_cv_id, normalize_job_id
+
 
 class CleanDocument(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -17,6 +19,14 @@ class GroundTruthRow(BaseModel):
     cv_id: str
     job_id: str
     relevant: int
+
+    @field_validator("cv_id", "job_id", mode="before")
+    @classmethod
+    def _norm_ids(cls, v):
+        s = str(v).strip()
+        if not s:
+            raise ValueError("cv_id/job_id must be non-empty")
+        return s
 
     @field_validator("relevant", mode="before")
     @classmethod
@@ -60,7 +70,15 @@ def validate_ground_truth_df(df: pd.DataFrame) -> pd.DataFrame:
     rows: list[dict] = []
     for _, r in df.iterrows():
         gr = GroundTruthRow(
-            cv_id=str(r["cv_id"]), job_id=str(r["job_id"]), relevant=int(r["relevant"])
+            cv_id=normalize_cv_id(r["cv_id"]),
+            job_id=normalize_job_id(r["job_id"]),
+            relevant=int(r["relevant"]),
         )
         rows.append(gr.model_dump())
-    return pd.DataFrame(rows)
+    out = pd.DataFrame(rows)
+    if out.empty:
+        return out
+    out["relevant"] = out["relevant"].astype(int)
+    # If aliases/prefixes collapse to the same canonical pair, keep strongest label.
+    out = out.groupby(["job_id", "cv_id"], as_index=False, sort=False)["relevant"].max()
+    return out

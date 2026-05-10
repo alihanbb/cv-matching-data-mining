@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 
 from src.schemas.documents import CleanDocument
+from src.utils.id_normalization import normalize_cv_id, normalize_job_id
 
 from .bronze_jsonl_io import bronze_jobs_path, bronze_resumes_path, iter_jsonl_objects
 from .text_extract import extract_text_from_path
@@ -41,7 +42,7 @@ def _passes_ranking_filter(source: str, ranking_sources: list[str]) -> bool:
 
 
 def _bronze_resume_row(obj: dict[str, Any], cleaner, src_default: str) -> dict[str, Any] | None:
-    rid = str(obj.get("resume_id", "") or obj.get("cv_id", "") or "").strip()
+    rid = normalize_cv_id(obj.get("resume_id", "") or obj.get("cv_id", "") or "")
     raw_text = str(obj.get("raw_text", "") or obj.get("text", "") or "").strip()
     if not rid or not raw_text:
         return None
@@ -83,6 +84,9 @@ def build_processed_from_raw(
 
     ing = ingest_cfg or {}
     ranking_sources = [str(x).strip() for x in (ing.get("ranking_sources") or []) if str(x).strip()]
+    ner_only_sources = {
+        str(x).strip() for x in (ing.get("ner_corpus_sources") or []) if str(x).strip()
+    }
 
     bronze_profile_rows: list[dict[str, Any]] = []
     ranking_cv_rows: list[dict[str, Any]] = []
@@ -101,7 +105,10 @@ def build_processed_from_raw(
                 if not row:
                     continue
                 bronze_profile_rows.append(dict(row))
-                if _passes_ranking_filter(row["source"], ranking_sources):
+                if (
+                    _passes_ranking_filter(row["source"], ranking_sources)
+                    and row["source"] not in ner_only_sources
+                ):
                     if len(row["raw_text"].strip()) >= SHORT_TEXT_CHARS:
                         ranking_cv_rows.append(dict(row))
                 else:
@@ -139,7 +146,9 @@ def build_processed_from_raw(
             if not text.strip():
                 logger.debug("Skipping CV file (empty text after extract): %s", fp.name)
                 continue
-            did = _doc_id_from_path(raw_cvs_dir, fp)
+            did = normalize_cv_id(_doc_id_from_path(raw_cvs_dir, fp))
+            if not did:
+                continue
             cleaned_text = cleaner.clean(text)
             try:
                 CleanDocument(doc_id=did, text=cleaned_text)
@@ -177,9 +186,12 @@ def build_processed_from_raw(
     dup_extra_rank = 0
     if extra_cv_rows:
         for r in extra_cv_rows:
-            cid = str(r.get("cv_id", "")).strip()
+            cid = normalize_cv_id(r.get("cv_id", ""))
             txt = str(r.get("text", "")).strip()
+            src = str(r.get("source", "") or "jsonl_corpus").strip()
             if not cid or not txt:
+                continue
+            if src in ner_only_sources:
                 continue
             if len(txt) < SHORT_TEXT_CHARS:
                 short_extra_rank += 1
@@ -192,7 +204,7 @@ def build_processed_from_raw(
                 continue
             nrow = {
                 "cv_id": cid,
-                "source": str(r.get("source", "") or "jsonl_corpus"),
+                "source": src,
                 "source_file": str(r.get("source_file", "") or ""),
                 "raw_text": txt,
                 "cleaned_text": cleaned_txt,
@@ -230,7 +242,7 @@ def build_processed_from_raw(
             for obj in iter_jsonl_objects(bronze_job_path):
                 if not isinstance(obj, dict):
                     continue
-                jid = str(obj.get("job_id", "") or "").strip()
+                jid = normalize_job_id(obj.get("job_id", "") or "")
                 raw_text = str(obj.get("raw_text", "") or obj.get("text", "") or "").strip()
                 title = str(obj.get("title", "") or jid or "").strip()
                 if not jid or not raw_text:
@@ -263,7 +275,9 @@ def build_processed_from_raw(
             if not text.strip():
                 logger.debug("Skipping job file (empty text after extract): %s", fp.name)
                 continue
-            did = _doc_id_from_path(raw_jobs_dir, fp)
+            did = normalize_job_id(_doc_id_from_path(raw_jobs_dir, fp))
+            if not did:
+                continue
             cleaned_job = cleaner.clean(text)
             try:
                 CleanDocument(doc_id=did, text=cleaned_job)

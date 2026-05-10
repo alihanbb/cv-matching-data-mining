@@ -8,6 +8,13 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from src.utils.dashboard_ranking import (
+    NER_SOURCE_TAGS,
+    RANKING_SOURCE_TAGS,
+    prepare_candidate_ranking_view,
+)
+from src.utils.id_normalization import normalize_cv_id, normalize_job_id
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 EXPLAINED_PATH = PROJECT_ROOT / "data" / "gold" / "rankings" / "candidate_scores_explained.csv"
 UNIFIED_PATH = PROJECT_ROOT / "data" / "silver" / "unified_resumes.jsonl"
@@ -27,6 +34,10 @@ def load_rankings(path: Path) -> pd.DataFrame:
         df["bm25_score"] = 0.0
     if "final_score" not in df.columns and "score" in df.columns:
         df = df.rename(columns={"score": "final_score"})
+    if "cv_id" in df.columns:
+        df["cv_id"] = df["cv_id"].map(normalize_cv_id)
+    if "job_id" in df.columns:
+        df["job_id"] = df["job_id"].map(normalize_job_id)
     return df
 
 
@@ -62,7 +73,8 @@ def _unified_doc_id(row: dict) -> str:
 def _cv_text_for_id(cvs_silver: pd.DataFrame, cv_id: str) -> str | None:
     if cvs_silver.empty or "cv_id" not in cvs_silver.columns:
         return None
-    row = cvs_silver[cvs_silver["cv_id"].astype(str) == str(cv_id)]
+    target = normalize_cv_id(cv_id)
+    row = cvs_silver[cvs_silver["cv_id"].astype(str).map(normalize_cv_id) == target]
     if row.empty or "text" not in row.columns:
         return None
     return str(row["text"].iloc[0])
@@ -70,7 +82,6 @@ def _cv_text_for_id(cvs_silver: pd.DataFrame, cv_id: str) -> str | None:
 
 def tab_ranking(rankings: pd.DataFrame, jobs_silver: pd.DataFrame, cvs_silver: pd.DataFrame) -> None:
     st.subheader("Candidate ranking")
-    job_ids = sorted(rankings["job_id"].astype(str).unique().tolist())
     model_cols = [
         "final_score",
         "final_score_v2_bm25",
@@ -79,12 +90,36 @@ def tab_ranking(rankings: pd.DataFrame, jobs_silver: pd.DataFrame, cvs_silver: p
     ]
     available = [c for c in model_cols if c in rankings.columns and rankings[c].notna().any()]
     score_col = st.selectbox("Score column", available or ["final_score"])
+    include_ner_sources = st.checkbox("Include NER-only corpus sources", value=False)
+
+    source_filtered = rankings.copy()
+    if "source" in source_filtered.columns:
+        source_filtered["source"] = source_filtered["source"].fillna("").astype(str).str.strip()
+        source_filtered = source_filtered[source_filtered["source"].isin(set(RANKING_SOURCE_TAGS))]
+        if not include_ner_sources:
+            source_filtered = source_filtered[
+                ~source_filtered["source"].isin(set(NER_SOURCE_TAGS))
+            ]
+    job_ids = sorted(source_filtered["job_id"].astype(str).unique().tolist())
+    if not job_ids:
+        st.warning("No ranking rows available after source filtering.")
+        return
+
     left, right = st.columns(2)
     with left:
         job = st.selectbox("Job", job_ids)
     with right:
         topn = st.slider("Top-N", 1, 20, 5)
-    block = rankings[rankings["job_id"].astype(str) == job].sort_values("rank_for_job").head(topn)
+    block = prepare_candidate_ranking_view(
+        rankings,
+        job_id=job,
+        score_column=score_col,
+        top_n=topn,
+        include_ner_sources=include_ner_sources,
+        ranking_sources=RANKING_SOURCE_TAGS,
+        ner_sources=NER_SOURCE_TAGS,
+    )
+
     show_cols = [
         "rank_for_job",
         "cv_id",
@@ -96,11 +131,14 @@ def tab_ranking(rankings: pd.DataFrame, jobs_silver: pd.DataFrame, cvs_silver: p
         "experience_score",
     ]
     st.dataframe(block[[c for c in show_cols if c in block.columns]])
-    jt = jobs_silver[jobs_silver["job_id"].astype(str) == job]
+    jt = jobs_silver[jobs_silver["job_id"].astype(str).map(normalize_job_id) == normalize_job_id(job)]
     if not jt.empty:
         st.text_area("İlan metni", jt["text"].iloc[0], height=200, label_visibility="visible")
 
     st.markdown("**Aday CV metinleri** — `data/silver/cleaned_cvs.csv` ile eşleşen kayıtlar")
+    if block.empty:
+        st.info("No candidates found for selected filters.")
+        return
     if cvs_silver.empty:
         st.warning(f"Silver CV tablosu yok veya boş: `{CVS_SILVER_PATH}`. Önce `python main.py --ingest` çalıştırın.")
     else:

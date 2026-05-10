@@ -22,8 +22,59 @@ from src.pipeline.matching_inputs import (
 from src.schemas.documents import validate_ground_truth_df
 from src.scoring.fusion import fuse_weighted_raw
 from src.utils.helpers import ensure_parent, resolve_path
+from src.utils.id_normalization import normalize_cv_id, normalize_job_id
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_ranked_ids(ranked: pd.DataFrame) -> pd.DataFrame:
+    out = ranked.copy()
+    out["cv_id"] = out["cv_id"].map(normalize_cv_id)
+    out["job_id"] = out["job_id"].map(normalize_job_id)
+    out = out[(out["cv_id"] != "") & (out["job_id"] != "")]
+    if out.empty:
+        return out
+
+    score_col = "score" if "score" in out.columns else None
+    if score_col is not None:
+        out[score_col] = pd.to_numeric(out[score_col], errors="coerce")
+        out = out.dropna(subset=[score_col])
+        out = out.sort_values(["job_id", score_col], ascending=[True, False], kind="mergesort")
+    else:
+        out["rank_for_job"] = pd.to_numeric(out["rank_for_job"], errors="coerce")
+        out = out.dropna(subset=["rank_for_job"])
+        out = out.sort_values(["job_id", "rank_for_job"], ascending=[True, True], kind="mergesort")
+
+    out = out.drop_duplicates(subset=["job_id", "cv_id"], keep="first")
+    if score_col is not None:
+        out = out.sort_values(["job_id", score_col], ascending=[True, False], kind="mergesort")
+    else:
+        out = out.sort_values(["job_id", "rank_for_job"], ascending=[True, True], kind="mergesort")
+    out["rank_for_job"] = out.groupby("job_id").cumcount() + 1
+    return out
+
+
+def _log_gt_alignment(model_name: str, ranked: pd.DataFrame, ground_truth: pd.DataFrame) -> None:
+    gt_pairs = ground_truth[["job_id", "cv_id"]].drop_duplicates()
+    ranked_pairs = ranked[["job_id", "cv_id"]].drop_duplicates()
+    merged = gt_pairs.merge(ranked_pairs, on=["job_id", "cv_id"], how="left", indicator=True)
+    total = int(len(merged))
+    matched = int((merged["_merge"] == "both").sum())
+    unmatched = total - matched
+    logger.info(
+        "%s evaluation alignment: total_ground_truth_rows=%d matched_ground_truth_rows=%d unmatched_ground_truth_rows=%d",
+        model_name,
+        total,
+        matched,
+        unmatched,
+    )
+    if total > 0 and (matched / total) < 0.10:
+        logger.warning(
+            "%s: ground-truth alignment is very low (matched_ground_truth_rows=%d/%d). Check cv_id/job_id normalization and source consistency.",
+            model_name,
+            matched,
+            total,
+        )
 
 
 def _rank_tfidf_baseline(m: MatchingMatrices, top_k: int) -> pd.DataFrame:
@@ -130,6 +181,8 @@ def evaluate_models(
     eval_rows: list[dict[str, Any]] = []
     comp_rows: list[dict[str, Any]] = []
     for name, ranked in spec:
+        ranked = _normalize_ranked_ids(ranked)
+        _log_gt_alignment(name, ranked, gt)
         row: dict[str, Any] = {"model": name}
         for k in ks:
             row[f"precision_at_{k}"] = precision_at_k(ranked, gt, k)
