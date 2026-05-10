@@ -93,16 +93,16 @@ final_score_v2_bm25 =
 
 ## Key commands
 
-| Goal | Command |
-|---|---|
+| Goal                          | Command                                                                                |
+| ----------------------------- | -------------------------------------------------------------------------------------- |
 | External repos → Bronze JSONL | `python scripts/import_external_repos_to_bronze.py --source-root .. --all --overwrite` |
-| Bronze → Silver | `python main.py --ingest` |
-| Quick baseline | `python main.py --no-semantic` |
-| Semantic pipeline | `python main.py --semantic` |
-| Hybrid V2 + BM25 | `python main.py --semantic --bm25` |
-| Evaluation (optional GT) | `python main.py --evaluate` |
-| Model comparison CSV | `python main.py --export-eval-csv` |
-| Dashboard | `streamlit run app/streamlit_app.py` |
+| Bronze → Silver               | `python main.py --ingest`                                                              |
+| Quick baseline                | `python main.py --no-semantic`                                                         |
+| Semantic pipeline             | `python main.py --semantic`                                                            |
+| Hybrid V2 + BM25              | `python main.py --semantic --bm25`                                                     |
+| Evaluation (optional GT)      | `python main.py --evaluate`                                                            |
+| Model comparison CSV          | `python main.py --export-eval-csv`                                                     |
+| Dashboard                     | `streamlit run app/streamlit_app.py`                                                   |
 
 ---
 

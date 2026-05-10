@@ -7,12 +7,12 @@ as a **one-time import step** and how they align with the preferred Bronze JSONL
 
 ## Supported Sources
 
-| Source folder | `--source` alias | Notes |
-|---|---|---|
-| `NLP_NER_ON_RESUME` | `nlp_ner` | Sample JSON resume text |
-| `Entity-Recognition-In-Resumes-SpaCy` | `dataturks` | DataTurks train/test NER annotations |
-| `vacancy-resume-matching-dataset` | `vanetik` | DOCX CVs + vacancy CSV, ground-truth template |
-| `NER-Annotated-CVs` | `mehyar` | Annotated JSON (ZIP must be extracted first) |
+| Source folder                         | `--source` alias | Notes                                         |
+| ------------------------------------- | ---------------- | --------------------------------------------- |
+| `NLP_NER_ON_RESUME`                   | `nlp_ner`        | Sample JSON resume text                       |
+| `Entity-Recognition-In-Resumes-SpaCy` | `dataturks`      | DataTurks train/test NER annotations          |
+| `vacancy-resume-matching-dataset`     | `vanetik`        | DOCX CVs + vacancy CSV, ground-truth template |
+| `NER-Annotated-CVs`                   | `mehyar`         | Annotated JSON (ZIP must be extracted first)  |
 
 Full path matching uses the `REPO_ALIASES` map in the import script.
 If a folder is not found, a warning is logged and that source is skipped.
@@ -21,13 +21,13 @@ If a folder is not found, a warning is logged and that source is skipped.
 
 ## Bronze Outputs
 
-| Output file | Description |
-|---|---|
-| `data/bronze/resumes/resumes_bronze.jsonl` | Resume rows (`resume_id`, `raw_text`, `source`, …) |
-| `data/bronze/jobs/jobs_bronze.jsonl` | Job-description rows |
-| `data/bronze/annotations/ner_annotations_bronze.jsonl` | NER entity lists (profile / enrichment use) |
-| `*.stats.json` | Row counts and `source` distribution per JSONL file |
-| `data/evaluation/ground_truth.csv` | Possible template or partial ground truth (manual verification recommended) |
+| Output file                                            | Description                                                                 |
+| ------------------------------------------------------ | --------------------------------------------------------------------------- |
+| `data/bronze/resumes/resumes_bronze.jsonl`             | Resume rows (`resume_id`, `raw_text`, `source`, …)                          |
+| `data/bronze/jobs/jobs_bronze.jsonl`                   | Job-description rows                                                        |
+| `data/bronze/annotations/ner_annotations_bronze.jsonl` | NER entity lists (profile / enrichment use)                                 |
+| `*.stats.json`                                         | Row counts and `source` distribution per JSONL file                         |
+| `data/evaluation/ground_truth.csv`                     | Possible template or partial ground truth (manual verification recommended) |
 
 **Fallback:** If the JSONL files above are missing or empty, the ingest step reads raw files from:
 
@@ -59,11 +59,11 @@ python scripts/import_external_repos_to_bronze.py --source-root .. --source vane
 
 ## Source Usage Strategy
 
-| Source | Typical use |
-|---|---|
-| **Vanetik** | Ranking corpus + evaluation base (job–CV pairs, GT template) |
-| **DataTurks / Mehyar** | Silver profile / NER; aligned via `ner_corpus_sources` in config |
-| **NLP\_NER\_ON\_RESUME** | Schema reference; sample volume may be small |
+| Source                   | Typical use                                                      |
+| ------------------------ | ---------------------------------------------------------------- |
+| **Vanetik**              | Ranking corpus + evaluation base (job–CV pairs, GT template)     |
+| **DataTurks / Mehyar**   | Silver profile / NER; aligned via `ner_corpus_sources` in config |
+| **NLP\_NER\_ON\_RESUME** | Schema reference; sample volume may be small                     |
 
 `ingest.ranking_sources` in `config/config.yaml` controls which `source`-tagged rows
 enter the ranking corpus (empty list = accept all sources).

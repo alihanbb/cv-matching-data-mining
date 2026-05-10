@@ -1,44 +1,26 @@
-# -----------------------------------------------------------------------------
-# Data layers — keep large corpora and generated tables local only
-# (tracked test fixtures live under tests/fixtures/, not ignored)
-# -----------------------------------------------------------------------------
+# Data layers
 data/bronze/
 data/silver/
 data/gold/
 data/external/
 
-# Wide generated CSV / JSONL under data/ (explicit patterns, not tests/)
-data/silver/**/*.csv
-data/silver/**/*.jsonl
-data/gold/**/*.csv
-data/gold/**/*.pkl
-data/bronze/**/*.jsonl
-
-# Binary or archive inputs — anywhere in the project (test fixtures are tracked explicitly)
+# Binary or archive inputs
 *.docx
 *.pdf
 *.zip
 
-# -----------------------------------------------------------------------------
 # Python bytecode
-# -----------------------------------------------------------------------------
 __pycache__/
 *.pyc
 
-# -----------------------------------------------------------------------------
 # Tests / notebooks cache
-# -----------------------------------------------------------------------------
 .pytest_cache/
 .ipynb_checkpoints/
 
-# -----------------------------------------------------------------------------
 # Run manifests
-# -----------------------------------------------------------------------------
 artifacts/runs/
 
-# -----------------------------------------------------------------------------
-# Virtual environments & builds
-# -----------------------------------------------------------------------------
+# Virtual environments and builds
 .ruff_cache/
 .venv/
 venv/
@@ -47,7 +29,5 @@ env/
 dist/
 build/
 
-# -----------------------------------------------------------------------------
 # OS / editors
-# -----------------------------------------------------------------------------
 .DS_Store
