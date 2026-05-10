@@ -40,9 +40,7 @@ def _passes_ranking_filter(source: str, ranking_sources: list[str]) -> bool:
     return bool(src and src in ranking_sources)
 
 
-def _bronze_resume_row(
-    obj: dict[str, Any], cleaner, src_default: str
-) -> dict[str, Any] | None:
+def _bronze_resume_row(obj: dict[str, Any], cleaner, src_default: str) -> dict[str, Any] | None:
     rid = str(obj.get("resume_id", "") or obj.get("cv_id", "") or "").strip()
     raw_text = str(obj.get("raw_text", "") or obj.get("text", "") or "").strip()
     if not rid or not raw_text:
@@ -84,9 +82,7 @@ def build_processed_from_raw(
     )
 
     ing = ingest_cfg or {}
-    ranking_sources = [
-        str(x).strip() for x in (ing.get("ranking_sources") or []) if str(x).strip()
-    ]
+    ranking_sources = [str(x).strip() for x in (ing.get("ranking_sources") or []) if str(x).strip()]
 
     bronze_profile_rows: list[dict[str, Any]] = []
     ranking_cv_rows: list[dict[str, Any]] = []
@@ -192,9 +188,7 @@ def build_processed_from_raw(
             try:
                 CleanDocument(doc_id=cid, text=cleaned_txt)
             except Exception as exc:
-                logger.warning(
-                    "Skipping extra CV row (validation failed) id=%s: %s", cid, exc
-                )
+                logger.warning("Skipping extra CV row (validation failed) id=%s: %s", cid, exc)
                 continue
             nrow = {
                 "cv_id": cid,
@@ -237,9 +231,7 @@ def build_processed_from_raw(
                 if not isinstance(obj, dict):
                     continue
                 jid = str(obj.get("job_id", "") or "").strip()
-                raw_text = str(
-                    obj.get("raw_text", "") or obj.get("text", "") or ""
-                ).strip()
+                raw_text = str(obj.get("raw_text", "") or obj.get("text", "") or "").strip()
                 title = str(obj.get("title", "") or jid or "").strip()
                 if not jid or not raw_text:
                     continue
@@ -269,9 +261,7 @@ def build_processed_from_raw(
                 )
                 continue
             if not text.strip():
-                logger.debug(
-                    "Skipping job file (empty text after extract): %s", fp.name
-                )
+                logger.debug("Skipping job file (empty text after extract): %s", fp.name)
                 continue
             did = _doc_id_from_path(raw_jobs_dir, fp)
             cleaned_job = cleaner.clean(text)

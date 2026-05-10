@@ -5,76 +5,37 @@ Projenin uçtan uca veri akışı aşağıdaki Mermaid diyagramında özetlenmi�
 ## Üst düzey akış
 
 ```mermaid
-flowchart LR
-    subgraph External["External repositories (import only)"]
-        XR[NLP_NER_ON_RESUME / vacancy-matching / NER CVs ...]
-    end
+flowchart TB
+    XR["External repos<br/>(cloned sibling folders)"]
 
-    subgraph Bronze["Bronze (canonical JSONL or folder ingest)"]
-        BX[resumes_bronze.jsonl · jobs_bronze.jsonl · ner_annotations_bronze.jsonl]
-        B1[CV PDF / DOCX / TXT / MD fallback]
-        B2[Job description files fallback]
-    end
+    IMP["Import to Bronze JSONL<br/><code>import_external_repos_to_bronze.py</code>"]
 
-    subgraph Silver["Silver (cleaned + profiles)"]
-        S1[cleaned_cvs.csv]
-        S2[cleaned_jobs.csv]
-        SU[unified_resumes.jsonl · resume_profiles.jsonl · job_profiles.jsonl · silver_stats.json]
-    end
+    BR["Bronze layer<br/>JSONL resumes, jobs, NER"]
 
-    subgraph Features["Feature extraction"]
-        F1[TF-IDF cosine]
-        F2[Semantic SBERT cosine]
-        F2b[BM25 optional]
-        F3[Requirement coverage + skill Jaccard]
-        F4[Experience match · cv_quality from Silver]
-    end
+    FB["Folder fallback<br/>bronze/cvs · job_descriptions"]
 
-    subgraph Gold["Gold (ranking + evaluation)"]
-        G1[candidate_scores.csv · candidate_scores_explained.csv · top_candidates_by_job.csv]
-        GE[evaluation_results.csv · model_comparison.csv · score_audit_report.csv]
-        G3[tfidf_model.pkl]
-        G4[artifacts/runs manifest]
-    end
+    SV["Silver cleaning & profiling<br/>CSVs · profiles · stats"]
 
-    subgraph Evaluation["Offline evaluation"]
-        E1[ground_truth.csv optional]
-        E2[Precision@K / Recall@K / NDCG@K / MRR / MAP]
-    end
+    FE["Feature extraction<br/>TF-IDF · SBERT · BM25 · skills · experience"]
 
-    subgraph UI["Consumption"]
-        U1[Dashboard / notebooks / Colab]
-    end
+    GD["Gold ranking<br/>scores · explained · top-k"]
 
-    XR -->|scripts/import_external_repos_to_bronze.py| BX
-    BX -->|main.py --ingest priority| S1
-    BX --> S2
-    B1 -->|folder ingest if no JSONL| S1
-    B2 --> S2
-    SU --> S1
-    S1 --> F1
-    S1 --> F2
-    S1 --> F2b
-    S1 --> F3
-    S1 --> F4
-    S2 --> F1
-    S2 --> F2
-    S2 --> F2b
-    S2 --> F3
-    S2 --> F4
-    F1 --> G1
-    F2 --> G1
-    F2b --> G1
-    F3 --> G1
-    F4 --> G1
-    F1 --> G3
-    G1 --> GE
-    E1 --> E2
-    GE --> E2
-    G1 --> U1
+    EV["Evaluation<br/>optional ground_truth.csv"]
+
+    UI["Dashboard / notebooks / Colab"]
+
+    XR --> IMP
+    IMP --> BR
+    BR --> SV
+    FB -.->|if JSONL missing| SV
+    SV --> FE --> GD --> EV --> UI
 ```
 
+## Açıklanabilir CSV (özet kolonlar)
 
+`source`, kanal skorları, `skill_jaccard_score`, `cv_quality_score`, `must_have_coverage`, `nice_to_have_coverage`,
+`final_score_v1`, `final_score_v2_bm25`, `fusion_minmax_normalized_v1`, `score_check`, `score_diff`, `score_warning`,
+liste ve metinsel açıklama kolonları.
 
 ## Skor formülü (Hybrid V1, raw bileşenler)
 
@@ -91,20 +52,18 @@ final_score_v2_bm25 =
   0.25 * tfidf + 0.25 * semantic + 0.20 * bm25 + 0.20 * skill + 0.10 * experience
 ```
 
-`source`, `tfidf_score`, `semantic_score`, `bm25_score`, `skill_jaccard_score`, `skill_score`, `experience_score`, `cv_quality_score`, `must_have_coverage`, `final_score_v1`, `final_score_v2_bm25`, `fusion_minmax_normalized_v1`, `explanation`, `suggested_improvements`, ...
-
 ## Önemli komutlar
 
-
-| Amaç                                         | Komut                                |
-| -------------------------------------------- | ------------------------------------ |
-| Bronze → Silver                              | `python main.py --ingest`            |
-| Hızlı baseline (TF-IDF + skill + experience) | `python main.py --no-semantic`       |
-| Tam pipeline (semantic dahil)                | `python main.py --semantic`          |
-| Hybrid V2                                    | `python main.py --semantic --bm25`   |
-| Açık değerlendirme                           | `python main.py --evaluate`          |
-| Model karşılaştırma CSV                      | `python main.py --export-eval-csv`   |
-| Dashboard                                    | `streamlit run app/streamlit_app.py` |
+| Amaç | Komut |
+|------|------|
+| External → Bronze JSONL | `python scripts/import_external_repos_to_bronze.py --source-root .. --all --overwrite` |
+| Bronze → Silver | `python main.py --ingest` |
+| Hızlı baseline (TF-IDF + structured) | `python main.py --no-semantic` |
+| Tam pipeline (semantic) | `python main.py --semantic` |
+| Hybrid V2 + BM25 | `python main.py --semantic --bm25` |
+| Değerlendirme (GT opsiyonel) | `python main.py --evaluate` |
+| Model karşılaştırma CSV | `python main.py --export-eval-csv` |
+| Dashboard | `streamlit run app/streamlit_app.py` |
 
 
 ---

@@ -18,9 +18,7 @@ def main() -> None:
     try:
         from datasets import load_dataset
     except ImportError as e:
-        raise SystemExit(
-            'Install optional extra: pip install -e ".[data_imports]"'
-        ) from e
+        raise SystemExit('Install optional extra: pip install -e ".[data_imports]"') from e
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
@@ -57,9 +55,7 @@ def main() -> None:
     if gt_rows:
         import pandas as pd
 
-        pd.DataFrame(gt_rows).drop_duplicates().to_csv(
-            eval_dir / "ground_truth.csv", index=False
-        )
+        pd.DataFrame(gt_rows).drop_duplicates().to_csv(eval_dir / "ground_truth.csv", index=False)
     (eval_dir / "import_hf_cv_matcher_note.json").write_text(
         json.dumps(
             {

@@ -28,9 +28,7 @@ logger = logging.getLogger(__name__)
 
 def _rank_tfidf_baseline(m: MatchingMatrices, top_k: int) -> pd.DataFrame:
     w = {"tfidf": 1.0, "dense": 0.0, "skills": 0.0, "experience": 0.0}
-    fused, _ = fuse_weighted_raw(
-        m.sim_lex, None, m.skill_score, m.exp_mat, w, False, bm25=None
-    )
+    fused, _ = fuse_weighted_raw(m.sim_lex, None, m.skill_score, m.exp_mat, w, False, bm25=None)
     return rankings_from_fused(fused, m.cv_ids, m.job_ids, top_k)
 
 
@@ -42,9 +40,7 @@ def _rank_semantic_only(m: MatchingMatrices, top_k: int) -> pd.DataFrame:
     return rankings_from_fused(fused, m.cv_ids, m.job_ids, top_k)
 
 
-def _rank_hybrid_v1(
-    m: MatchingMatrices, top_k: int, cfg: dict[str, Any]
-) -> pd.DataFrame:
+def _rank_hybrid_v1(m: MatchingMatrices, top_k: int, cfg: dict[str, Any]) -> pd.DataFrame:
     w = dict(cfg.get("fusion", {}).get("weights", {})) or dict(FUSION_V1_WEIGHTS)
     fused, _ = fuse_weighted_raw(
         m.sim_lex, m.dense_sim, m.skill_score, m.exp_mat, w, m.dense_enabled, bm25=None
@@ -52,9 +48,7 @@ def _rank_hybrid_v1(
     return rankings_from_fused(fused, m.cv_ids, m.job_ids, top_k)
 
 
-def _rank_hybrid_v2(
-    m: MatchingMatrices, top_k: int, cfg: dict[str, Any]
-) -> pd.DataFrame:
+def _rank_hybrid_v2(m: MatchingMatrices, top_k: int, cfg: dict[str, Any]) -> pd.DataFrame:
     w = dict(cfg.get("fusion_v2", {}).get("weights", {})) or dict(FUSION_V2_WEIGHTS)
     if not m.bm25_enabled or m.bm25 is None:
         return _rank_hybrid_v1(m, top_k, cfg)
@@ -106,13 +100,13 @@ def evaluate_models(
     *,
     semantic: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    gt_path = resolve_path(
-        root, cfg["paths"].get("ground_truth", "data/evaluation/ground_truth.csv")
-    )
+    paths_cfg = cfg.get("paths", {})
+    gt_rel = paths_cfg.get("ground_truth", "data/evaluation/ground_truth.csv")
+    gt_path = resolve_path(root, gt_rel)
     if not gt_path.is_file():
         logger.warning(
-            "Ground truth not found at %s — skipping evaluation export (evaluation_results / model_comparison).",
-            gt_path,
+            "Evaluation skipped: %s not found.",
+            gt_rel,
         )
         return pd.DataFrame(), pd.DataFrame()
     gt = validate_ground_truth_df(pd.read_csv(gt_path))
@@ -145,24 +139,17 @@ def evaluate_models(
         row["mrr"] = mean_reciprocal_rank(ranked, gt)
         row["map"] = mean_average_precision(ranked, gt)
         eval_rows.append(row)
-        comp_rows.append(
-            {"model": name, **{f"ndcg_at_{k}": row[f"ndcg_at_{k}"] for k in ks}}
-        )
+        comp_rows.append({"model": name, **{f"ndcg_at_{k}": row[f"ndcg_at_{k}"] for k in ks}})
 
     eval_df = pd.DataFrame(eval_rows)
     comp_df = pd.DataFrame(comp_rows)
-    paths_cfg = cfg.get("paths", {})
     eval_out = resolve_path(
         root,
-        paths_cfg.get(
-            "evaluation_results_csv", "data/gold/evaluation/evaluation_results.csv"
-        ),
+        paths_cfg.get("evaluation_results_csv", "data/gold/evaluation/evaluation_results.csv"),
     )
     comp_out = resolve_path(
         root,
-        paths_cfg.get(
-            "model_comparison_csv", "data/gold/evaluation/model_comparison.csv"
-        ),
+        paths_cfg.get("model_comparison_csv", "data/gold/evaluation/model_comparison.csv"),
     )
     ensure_parent(eval_out)
     ensure_parent(comp_out)

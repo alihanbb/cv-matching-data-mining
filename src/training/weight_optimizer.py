@@ -70,9 +70,7 @@ def optimize_weights(
         channel_keys = ["tfidf", "dense", "skills", "experience"]
 
     candidates = _random_weight_candidates(channel_keys, trials)
-    logger.info(
-        "Random weight search: %d candidates, channels=%s", trials, channel_keys
-    )
+    logger.info("Random weight search: %d candidates, channels=%s", trials, channel_keys)
 
     rows: list[dict[str, Any]] = []
     best_w: dict[str, float] | None = None

@@ -78,9 +78,7 @@ CROSS_ENCODER_MODEL_NAME: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 # Embedding model defaults
 # ---------------------------------------------------------------------------
 
-DEFAULT_EMBEDDING_MODEL: str = (
-    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-)
+DEFAULT_EMBEDDING_MODEL: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 DEFAULT_EMBEDDING_BATCH_SIZE: int = 32
 
 # ---------------------------------------------------------------------------

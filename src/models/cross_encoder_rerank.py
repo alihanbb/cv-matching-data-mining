@@ -23,9 +23,7 @@ def rerank_with_cross_encoder(
     try:
         from sentence_transformers import CrossEncoder
     except ImportError as e:
-        raise ImportError(
-            "sentence-transformers required for cross-encoder reranking."
-        ) from e
+        raise ImportError("sentence-transformers required for cross-encoder reranking.") from e
 
     df = pd.read_csv(explained_path)
     if df.empty:
@@ -62,9 +60,7 @@ def rerank_with_cross_encoder(
     out = df.copy()
     out["cross_encoder_score"] = np.nan
     if "final_score_v2_bm25" in out.columns:
-        out["final_rerank_score"] = out["final_score_v2_bm25"].fillna(
-            out["final_score"]
-        )
+        out["final_rerank_score"] = out["final_score_v2_bm25"].fillna(out["final_score"])
     else:
         out["final_rerank_score"] = out["final_score"].copy()
     for (row_idx, _, _), s in zip(meta, scores_norm, strict=False):

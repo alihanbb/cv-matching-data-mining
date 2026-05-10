@@ -25,15 +25,11 @@ class SkillsLexicon:
         out: dict[str, list[str]] = {}
         for sid in sorted(skill_ids):
             cat = self.category_by_skill.get(sid, "uncategorized")
-            out.setdefault(cat, []).append(
-                self.skills[sid].display if sid in self.skills else sid
-            )
+            out.setdefault(cat, []).append(self.skills[sid].display if sid in self.skills else sid)
         return out
 
 
-def _compile_patterns(
-    skill_id: str, display: str, aliases: list[str]
-) -> list[re.Pattern[str]]:
+def _compile_patterns(skill_id: str, display: str, aliases: list[str]) -> list[re.Pattern[str]]:
     parts: list[str] = []
     for raw in [skill_id.replace("_", " "), display] + list(aliases):
         s = str(raw).strip().lower()
@@ -46,9 +42,7 @@ def _compile_patterns(
             continue
         escaped = re.escape(token)
         if " " in token or "." in token or "#" in token or "/" in token:
-            pats.append(
-                re.compile(rf"(?:^|[^a-z0-9]){escaped}(?:$|[^a-z0-9])", re.IGNORECASE)
-            )
+            pats.append(re.compile(rf"(?:^|[^a-z0-9]){escaped}(?:$|[^a-z0-9])", re.IGNORECASE))
         else:
             pats.append(re.compile(rf"\b{escaped}\b", re.IGNORECASE))
     return pats

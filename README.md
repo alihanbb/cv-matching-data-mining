@@ -40,30 +40,49 @@ Detay: [docs/RAPOR.md](docs/RAPOR.md), diyagram: [docs/PIPELINE_DIAGRAM.md](docs
 
 ## Bronze / Silver / Gold data architecture
 
-| Katman | Dizin | İçerik |
-|---|---|---|
-| **Bronze** (ham) | `data/bronze/resumes/resumes_bronze.jsonl`, `data/bronze/jobs/jobs_bronze.jsonl` _(tercih edilen)_ veya klasör ingest: `data/bronze/cvs/`, `data/bronze/job_descriptions/` | Orijinal içerik; JSONL pipeline için kanonik forma dönüştürülmüş satırlar. |
-| **Silver** (temiz) | `data/silver/cleaned_cvs.csv`, `data/silver/cleaned_jobs.csv`, `data/silver/unified_resumes.jsonl`, `data/silver/resume_profiles.jsonl`, `data/silver/job_profiles.jsonl`, `data/silver/silver_stats.json` | Normalize tablo ve profiller; CV’lerde `cv_id` (Bronze `resume_id`), PII maskeli metin, çıkarılmış beceriler/bölümler. |
-| **Gold** (model + sonuç) | `data/gold/models/tfidf_model.pkl`, `data/gold/rankings/candidate_scores.csv`, `data/gold/rankings/candidate_scores_explained.csv`, `data/gold/rankings/top_candidates_by_job.csv`, `data/gold/evaluation/*.csv` | Eğitilmiş özellikler, sıralama ve değerlendirme çıktıları. |
-| **Etiketler** | `data/evaluation/ground_truth.csv` | Dereceli relevans (0–3), offline değerlendirme. |
-| **İz / Manifest** | `artifacts/runs/<UTC>/manifest.json` | Config özeti, artifact yolları, metrikler. |
+| Katman | Rol |
+|-------|-----|
+| **Bronze** | Ham / kanonik saklama; tercihen tek tip **JSONL**. |
+| **Silver** | Temiz metin, anonimleştirme, tablolar ve profil JSONL. |
+| **Gold** | Öğrenilmiş vektörleyici, sıralama CSV’leri, offline değerlendirme çıktıları. |
+
+**Tercih edilen Bronze dosyaları** (ingest önce bunları okur):
+
+| Dosya | İçerik |
+|-------|--------|
+| `data/bronze/resumes/resumes_bronze.jsonl` | Özgeçmiş satırları (`resume_id`, `raw_text`, `source`, …) |
+| `data/bronze/jobs/jobs_bronze.jsonl` | İş ilanı satırları |
+| `data/bronze/annotations/ner_annotations_bronze.jsonl` | NER anotasyonları (profil/korpus için) |
+
+**Fallback** (yüksekteki JSONL yoksa): `data/bronze/cvs/`, `data/bronze/job_descriptions/` altındaki PDF / DOCX / TXT / MD.
+
+**Önemli:** `main.py` eşleştirme kodu **dış repo klasörlerini doğrudan okumaz**. Dış veriler `scripts/import_external_repos_to_bronze.py` ile Bronze JSONL’ye alınır; pipeline yalnızca Bronze→Silver→Gold katmanından beslenir.
+
+| Katman | Tipik çıktı yolları |
+|-------|---------------------|
+| **Silver** | `data/silver/cleaned_cvs.csv`, `cleaned_jobs.csv`, `unified_resumes.jsonl`, `resume_profiles.jsonl`, `job_profiles.jsonl`, `silver_stats.json` |
+| **Gold** | `data/gold/rankings/candidate_scores.csv`, `candidate_scores_explained.csv`, `top_candidates_by_job.csv`, `data/gold/evaluation/*.csv`, `tfidf_model.pkl` |
+| **Etiketler** | `data/evaluation/ground_truth.csv` |
+| **Manifest** | `artifacts/runs/<UTC>/manifest.json` |
+
+---
 
 ## External Dataset Import
 
-Bu proje, dış CV/NER veri kaynaklarını doğrudan proje bağımlılığı yapmaz. Aynı üst dizine klonlanan repolardaki veriler tek seferlik import scripti ile standart Bronze JSONL formatına dönüştürülür.
+Bu proje **dış veri klasörlerini bağımlılık olarak sürekli taşımaz**. Klonları üst dizine alıp aşağıdaki script ile **Bronze JSONL** üretirsiniz.
 
-| Source | Purpose | Output |
-|---|---|---|
-| NLP_NER_ON_RESUME | Structured resume parsing reference | `resumes_bronze.jsonl` |
-| Entity-Recognition-In-Resumes-SpaCy | Resume NER annotations | `resumes_bronze.jsonl`, `ner_annotations_bronze.jsonl` |
-| vacancy-resume-matching-dataset | CV–job matching / evaluation | `resumes_bronze.jsonl`, `jobs_bronze.jsonl`, `ground_truth.csv` (veya template) |
-| NER-Annotated-CVs | Skill/entity annotations | `resumes_bronze.jsonl`, `ner_annotations_bronze.jsonl` |
+| Kaynak | Çıktıya katkı |
+|--------|----------------|
+| NLP_NER_ON_RESUME | Örnek JSON özgeçmiş → `resumes_bronze.jsonl` |
+| Entity-Recognition-In-Resumes-SpaCy | Train/test → `resumes`, `ner_annotations` |
+| vacancy-resume-matching-dataset | DOCX CV’ler ve ilan CSV → resumes, jobs, GT şablonu |
+| NER-Annotated-CVs | Annotated JSON → resumes, ner_annotations |
 
 ```bash
 python scripts/import_external_repos_to_bronze.py --source-root .. --all --overwrite
 ```
 
-Import sonrası (dış repoları silebilirsiniz):
+Ardından (dış klasörleri silebilirsiniz):
 
 ```bash
 python main.py --ingest
@@ -71,7 +90,7 @@ python main.py --semantic --bm25
 python main.py --evaluate
 ```
 
-Dış veri repoları yalnızca import aşamasında gereklidir. Veriler Bronze JSONL’e alındıktan sonra proje kendi standart veri katmanı üzerinden çalışır.
+Import tamamlandıktan sonra tüm rutin kullanım **Bronze JSONL ve Silver tablolar** üzerindendir.
 
 ## Baseline model: TF-IDF + Cosine Similarity
 
@@ -156,18 +175,22 @@ final_score_v1 =
 
 Varsayılan V1/V2 ağırlıkları `config/config.yaml` içindedir. **`ranking_score`**, kanalları **iş bazında min–max** normalize ederek üretilen füzyon skorudur (sıralama anahtarı).
 
-**Min–max ile elde edilmiş ayrı gösterge** (normalize edilmiş füzyon, `final_score` kolonunun yerine geçmez):
+**Min–max göstergesi** (`final_score` yerine geçmez; ayrı kolon):
 
-- `fusion_minmax_normalized_v1` — V1 ağırlıkları + min–max kanal füzyonu (çift başına).
+| Kolon | Anlamı |
+|-------|--------|
+| `fusion_minmax_normalized_v1` | V1 ağırlıklarıyla, kanallar iş bazında min–max sonra füzyon |
 
-Ek denetim kolonları:
+**Denetim (score audit)**
 
-- `score_check` (V1 ağırlıklarıyla satır üzerinden yeniden hesaplanan ham toplam; `final_score_v1` ile eşleşmelidir), `score_diff`, `score_warning`
+| Kolon | Anlamı |
+|-------|--------|
+| `score_check` | V1 ham ağırlıklarının satır üzerinden yeniden hesabı (`final_score_v1` ile tutarlı olmalı) |
+| `score_diff` | `final_score` ile `score_check` mutlak farkı |
+| `score_warning` | Eşik aşılırsa uyarı metni |
 
-Açıklanabilir CSV öne çıkan kolonlar:
-
-- `source`, `skill_jaccard_score`, `cv_quality_score`, `final_score_v1`, `final_score_v2_bm25`, `must_have_coverage`, `nice_to_have_coverage`, ilgili skill listeleri
-- `cv_years_experience`, `job_min_years_experience`, `explanation`, `suggested_improvements`
+Açıklanabilir CSV’de görünür diğer kolon örnekleri: `source`, `skill_jaccard_score`, `cv_quality_score`,
+`final_score_v1`, `final_score_v2_bm25`, kapsamlar ve açıklama metinleri.
 
 ## Requirement coverage (skill_score)
 
@@ -197,15 +220,24 @@ Ayrıntı: [docs/DATASETS.md](docs/DATASETS.md)
 
 ## Model comparison and evaluation export
 
-Ground truth varken:
+| Ne zaman | Ne yapılır |
+|---------|------------|
+| `ground_truth.csv` **var** | `python main.py` veya `--export-eval-csv` → `evaluation_results.csv`, `model_comparison.csv` yazılır |
+| `ground_truth.csv` **yok** | Run **durdurulmaz**; log: `Evaluation skipped: … not found.` |
 
 ```bash
 python main.py --export-eval-csv
 ```
 
-Çıktı: `data/gold/evaluation/evaluation_results.csv`, `data/gold/evaluation/model_comparison.csv`
+**Karşılaştırılan modeller**
 
-Karşılaştırılan modeller: TF-IDF baseline (**tfidf_score** ağırlıklı ham toplam), **Semantic Only**, Hybrid V1 (**final_score_v1** ile uyumlu ham füzyon), Hybrid V2+BM25 (**final_score_v2_bm25** ile uyumlu), Optimized Fusion (best weights dosyası varsa).
+| Model | Skor kanalı |
+|-------|-------------|
+| TF-IDF Baseline | Ham ağırlıkla yalnızca lexical |
+| Semantic Only | SBERT / dense |
+| Hybrid V1 | `final_score_v1` ile uyumlu ham fusion |
+| Hybrid V2 + BM25 | `final_score_v2_bm25` ile uyumlu |
+| Optimized Fusion | Varsa `artifacts/best_fusion_weights.json` |
 
 Metrikler: Precision@K, Recall@K, NDCG@K, MRR, MAP.
 
@@ -214,6 +246,7 @@ Metrikler: Precision@K, Recall@K, NDCG@K, MRR, MAP.
 ## How to run (nihai komutlar)
 
 ```bash
+python scripts/import_external_repos_to_bronze.py --source-root .. --all --overwrite
 python main.py --ingest
 python main.py
 python main.py --semantic
@@ -241,6 +274,7 @@ pip install -e ".[dev,semantic,bm25,dashboard]"
 ### Bronze → Silver
 
 ```bash
+python scripts/import_external_repos_to_bronze.py --source-root .. --all --overwrite
 python main.py --ingest
 ```
 
@@ -333,17 +367,17 @@ GitHub Actions: `.github/workflows/ci.yml` (`pytest` + `python main.py --no-sema
 ## Documentation map
 
 | Belge | Açıklama |
-|--------|-----------|
-| [docs/RAPOR.md](docs/RAPOR.md) | KDD süreciyle hizalı veri madenciliği raporu |
+|-------|----------|
+| [docs/RAPOR.md](docs/RAPOR.md) | KDD hizalı veri madenciliği raporu |
 | [docs/PIPELINE_DIAGRAM.md](docs/PIPELINE_DIAGRAM.md) | Mermaid pipeline diyagramı |
 | [docs/KVKK_VE_GUVENLIK.md](docs/KVKK_VE_GUVENLIK.md) | Kişisel veri ve anonimleştirme |
 | [docs/GROUND_TRUTH_GUIDE.md](docs/GROUND_TRUTH_GUIDE.md) | Etiket dosyası şeması |
 | [docs/MODEL_COMPARISON.md](docs/MODEL_COMPARISON.md) | Model karşılaştırma çıktıları |
-| [docs/DATASETS.md](docs/DATASETS.md) | Harici veri setleri ve import |
-| [docs/PROJE_KAVRAMSAL_REHBER.md](docs/PROJE_KAVRAMSAL_REHBER.md) | Senior data scientist bakışıyla genel rehber |
+| [docs/DATASETS.md](docs/DATASETS.md) | Harici veri setleri ve Bronze import |
+| [docs/PROJE_KAVRAMSAL_REHBER.md](docs/PROJE_KAVRAMSAL_REHBER.md) | Kavramsal rehber |
 | [docs/CALISTIRMA_ORTAMI_VE_GELISTIRME_YONETIMI.md](docs/CALISTIRMA_ORTAMI_VE_GELISTIRME_YONETIMI.md) | Operasyon ve geliştirme yönetimi |
 | [docs/MEVCUT_DURUM_VE_MIMARI.md](docs/MEVCUT_DURUM_VE_MIMARI.md) | Güncel durum ve mimari |
-| [docs/YOL_HARITASI.md](docs/YOL_HARITASI.md) | Fazlı yol haritası |
+| [docs/YOL_HARITASI.md](docs/YOL_HARITASI.md) | Yol haritası |
 
 ---
 

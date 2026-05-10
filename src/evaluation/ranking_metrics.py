@@ -50,11 +50,7 @@ def ndcg_at_k(ranked: pd.DataFrame, ground_truth: pd.DataFrame, k: int) -> float
         return 0.0
     scores: list[float] = []
     for job, cv_grade in grades.items():
-        sub = (
-            ranked[ranked["job_id"].astype(str) == job]
-            .sort_values("rank_for_job")
-            .head(k)
-        )
+        sub = ranked[ranked["job_id"].astype(str) == job].sort_values("rank_for_job").head(k)
         gained = [int(cv_grade.get(str(row["cv_id"]), 0)) for _, row in sub.iterrows()]
         dcg = _dcg(gained)
         ideal_grades = sorted(cv_grade.values(), reverse=True)[:k]

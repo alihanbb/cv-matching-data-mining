@@ -90,13 +90,9 @@ def _make_cfg(root: Path) -> dict:
             "processed_jobs": str(silver / "cleaned_jobs.csv"),
             "tfidf_model": str(gold / "models" / "tfidf_model.pkl"),
             "output_rankings": str(gold / "rankings" / "candidate_scores.csv"),
-            "output_explanations": str(
-                gold / "rankings" / "candidate_scores_explained.csv"
-            ),
+            "output_explanations": str(gold / "rankings" / "candidate_scores_explained.csv"),
         },
-        "skills": {
-            "path": str(Path(__file__).resolve().parents[1] / "config" / "skills.yaml")
-        },
+        "skills": {"path": str(Path(__file__).resolve().parents[1] / "config" / "skills.yaml")},
         "privacy": {"anonymize": True},
         "preprocessing": {
             "language": "en",
@@ -112,9 +108,7 @@ def _make_cfg(root: Path) -> dict:
         },
         "embeddings": {"enabled": False},
         "bm25": {"enabled": False},
-        "fusion": {
-            "weights": {"tfidf": 0.5, "dense": 0.0, "skills": 0.3, "experience": 0.2}
-        },
+        "fusion": {"weights": {"tfidf": 0.5, "dense": 0.0, "skills": 0.3, "experience": 0.2}},
         "fusion_v2": {
             "weights": {
                 "tfidf": 0.4,
@@ -183,12 +177,8 @@ class TestIngestStep:
 
         assert cv_out.is_file(), "cleaned_cvs.csv not created"
         assert job_out.is_file(), "cleaned_jobs.csv not created"
-        assert n_bronze == len(
-            _CV_TEXTS
-        ), f"Expected {len(_CV_TEXTS)} CV rows, got {n_bronze}"
-        assert n_jobs == len(
-            _JOB_TEXTS
-        ), f"Expected {len(_JOB_TEXTS)} job rows, got {n_jobs}"
+        assert n_bronze == len(_CV_TEXTS), f"Expected {len(_CV_TEXTS)} CV rows, got {n_bronze}"
+        assert n_jobs == len(_JOB_TEXTS), f"Expected {len(_JOB_TEXTS)} job rows, got {n_jobs}"
 
     def test_silver_csv_has_required_columns(self, project_root: Path) -> None:
         cfg = _make_cfg(project_root)
@@ -254,9 +244,7 @@ class TestFullPipeline:
         run_full_pipeline(ingested_root, cfg, semantic=False, bm25=False)
         df = pd.read_csv(cfg["paths"]["output_rankings"])
         score_cols = [
-            c
-            for c in df.columns
-            if "score" in c.lower() and df[c].dtype in (float, np.float64)
+            c for c in df.columns if "score" in c.lower() and df[c].dtype in (float, np.float64)
         ]
         for col in score_cols:
             vals = df[col].dropna()
@@ -278,9 +266,7 @@ class TestFullPipeline:
         run_full_pipeline(ingested_root, cfg, semantic=False, bm25=False)
         df = pd.read_csv(cfg["paths"]["output_rankings"])
         for job_id, grp in df.groupby("job_id"):
-            assert (
-                len(grp) <= top_k
-            ), f"job_id={job_id} has {len(grp)} rows, exceeds top_k={top_k}"
+            assert len(grp) <= top_k, f"job_id={job_id} has {len(grp)} rows, exceeds top_k={top_k}"
 
     def test_ranks_are_contiguous_from_one(self, ingested_root: Path) -> None:
         cfg = _make_cfg(ingested_root)
@@ -288,9 +274,7 @@ class TestFullPipeline:
         df = pd.read_csv(cfg["paths"]["output_rankings"])
         for job_id, grp in df.groupby("job_id"):
             ranks = sorted(grp["rank_for_job"].tolist())
-            assert (
-                ranks[0] == 1
-            ), f"job_id={job_id}: first rank is {ranks[0]}, expected 1"
+            assert ranks[0] == 1, f"job_id={job_id}: first rank is {ranks[0]}, expected 1"
             assert ranks == list(
                 range(1, len(ranks) + 1)
             ), f"job_id={job_id}: ranks not contiguous: {ranks}"
@@ -312,13 +296,9 @@ class TestFullPipeline:
                 grp
             ), f"job_id={job_id}: duplicate CV IDs in rankings"
 
-    def test_pipeline_returns_empty_metrics_without_ground_truth(
-        self, ingested_root: Path
-    ) -> None:
+    def test_pipeline_returns_empty_metrics_without_ground_truth(self, ingested_root: Path) -> None:
         cfg = _make_cfg(ingested_root)
-        metrics = run_full_pipeline(
-            ingested_root, cfg, semantic=False, bm25=False, evaluate=False
-        )
+        metrics = run_full_pipeline(ingested_root, cfg, semantic=False, bm25=False, evaluate=False)
         assert isinstance(metrics, dict)
 
 

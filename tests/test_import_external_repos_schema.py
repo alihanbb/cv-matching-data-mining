@@ -21,9 +21,7 @@ def _iter_jsonl(path: Path):
                 yield json.loads(line)
 
 
-@pytest.mark.skipif(
-    not (_FIX / "resumes_bronze.jsonl").is_file(), reason="fixture missing"
-)
+@pytest.mark.skipif(not (_FIX / "resumes_bronze.jsonl").is_file(), reason="fixture missing")
 def test_resumes_bronze_schema() -> None:
     for row in _iter_jsonl(_FIX / "resumes_bronze.jsonl"):
         for key in (
@@ -41,9 +39,7 @@ def test_resumes_bronze_schema() -> None:
         assert row["raw_text"].strip()
 
 
-@pytest.mark.skipif(
-    not (_FIX / "jobs_bronze.jsonl").is_file(), reason="fixture missing"
-)
+@pytest.mark.skipif(not (_FIX / "jobs_bronze.jsonl").is_file(), reason="fixture missing")
 def test_jobs_bronze_schema() -> None:
     for row in _iter_jsonl(_FIX / "jobs_bronze.jsonl"):
         for key in (
@@ -59,9 +55,7 @@ def test_jobs_bronze_schema() -> None:
         assert row["raw_text"].strip()
 
 
-@pytest.mark.skipif(
-    not (_FIX / "ner_annotations_bronze.jsonl").is_file(), reason="fixture missing"
-)
+@pytest.mark.skipif(not (_FIX / "ner_annotations_bronze.jsonl").is_file(), reason="fixture missing")
 def test_ner_annotations_bronze_schema() -> None:
     for row in _iter_jsonl(_FIX / "ner_annotations_bronze.jsonl"):
         for key in (

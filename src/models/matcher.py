@@ -62,9 +62,7 @@ def enrich_with_explanations(
     for _, r in ranked.iterrows():
         i = cv_pos[str(r["cv_id"])]
         j = job_pos[str(r["job_id"])]
-        ex = explain_pair(
-            cv_skill_sets[i], job_skill_sets[j], cv_years[i], job_required[j]
-        )
+        ex = explain_pair(cv_skill_sets[i], job_skill_sets[j], cv_years[i], job_required[j])
         matched.append(ex["matched_skills"])
         missing.append(ex["missing_skills"])
         notes.append(ex["experience_note"])
@@ -109,9 +107,7 @@ def enrich_detailed(
         matched_line = str(det["matched_required_skills"])
         if matched_line.strip():
             disp_m = ";".join(
-                lex.skills[x].display
-                for x in matched_line.split(";")
-                if x and x in lex.skills
+                lex.skills[x].display for x in matched_line.split(";") if x and x in lex.skills
             )
         else:
             disp_m = ""

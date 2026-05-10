@@ -84,11 +84,7 @@ def iter_ner_json(path: Path, source_name: str) -> Iterable[dict[str, Any]]:
         text = _safe_text(item.get("text"))
         raw_ann = item.get("annotations")
         annotations: list[Any]
-        if (
-            isinstance(raw_ann, list)
-            and raw_ann
-            and isinstance(raw_ann[0], (list, tuple))
-        ):
+        if isinstance(raw_ann, list) and raw_ann and isinstance(raw_ann[0], (list, tuple)):
             annotations = _mehyar_triples_to_entities(raw_ann)
         elif isinstance(raw_ann, list):
             annotations = raw_ann
@@ -138,9 +134,7 @@ def _dataturks_annotation_to_entities(annotation: Any) -> list[dict[str, Any]]:
     return out
 
 
-def iter_dataturks_resume_jsonl(
-    path: Path, source_name: str
-) -> Iterable[dict[str, Any]]:
+def iter_dataturks_resume_jsonl(path: Path, source_name: str) -> Iterable[dict[str, Any]]:
     """DataTurks export: one JSON object per line with ``content`` and ``annotation``."""
     if not path.is_file():
         return
@@ -180,9 +174,7 @@ def _mehyar_triples_to_entities(annotations: Any) -> list[dict[str, Any]]:
     return out
 
 
-def iter_mehyar_annotated_json_dir(
-    root: Path, source_name: str
-) -> Iterable[dict[str, Any]]:
+def iter_mehyar_annotated_json_dir(root: Path, source_name: str) -> Iterable[dict[str, Any]]:
     """Mehyarmlaweh/NER-Annotated-CVs: ``text`` + ``annotations`` as [start, end, label] triples."""
     if not root.is_dir():
         return
@@ -233,9 +225,7 @@ def json_resume_schema_to_text(obj: dict[str, Any]) -> str:
     for work in obj.get("work") or []:
         if not isinstance(work, dict):
             continue
-        header = " ".join(
-            _safe_text(work.get(k)) for k in ("position", "name") if work.get(k)
-        )
+        header = " ".join(_safe_text(work.get(k)) for k in ("position", "name") if work.get(k))
         if header:
             parts.append(header)
         for hl in work.get("highlights") or []:
@@ -317,9 +307,7 @@ def iter_structured_resume_csv(path: Path) -> Iterable[dict[str, Any]]:
         reader = csv.DictReader(f)
         for idx, row in enumerate(reader):
             text = _safe_text(row.get("Resume_Text"))
-            skills = [
-                x.strip() for x in _safe_text(row.get("Skills")).split(",") if x.strip()
-            ]
+            skills = [x.strip() for x in _safe_text(row.get("Skills")).split(",") if x.strip()]
             metadata = {
                 "name": _safe_text(row.get("Name")),
                 "email": _safe_text(row.get("Email")),
@@ -354,9 +342,7 @@ def iter_resume_corpus_csv(path: Path) -> Iterable[dict[str, Any]]:
             external_id = _safe_text(row.get("ID"))
             category = _safe_text(row.get("Category")) or None
             yield _make_record(
-                record_id=_stable_id(
-                    "resume_corpus_csv", external_id or str(idx), text[:100]
-                ),
+                record_id=_stable_id("resume_corpus_csv", external_id or str(idx), text[:100]),
                 source="resume_corpus_csv",
                 source_file=path,
                 source_row=idx,
@@ -422,9 +408,7 @@ def write_unified_dataset(
         iter_resume_corpus_csv(source_root / "Resume" / "Resume.csv"),
     ]
     if include_pdfs:
-        sources.append(
-            iter_category_pdfs(source_root / "data" / "data", limit=pdf_limit)
-        )
+        sources.append(iter_category_pdfs(source_root / "data" / "data", limit=pdf_limit))
     if include_workspace_clones:
         sources.extend(iter_workspace_cloned_repos(source_root.resolve()))
 
@@ -463,9 +447,7 @@ def write_unified_dataset(
     stats["by_category"] = dict(stats["by_category"])
 
     stats_path = output_path.with_suffix(output_path.suffix + ".stats.json")
-    stats_path.write_text(
-        json.dumps(stats, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    stats_path.write_text(json.dumps(stats, indent=2, ensure_ascii=False), encoding="utf-8")
     stats["stats_path"] = str(stats_path)
     return stats
 

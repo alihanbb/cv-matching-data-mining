@@ -27,9 +27,7 @@ def train_learned_fusion(
         import torch
         import torch.nn as nn
     except ImportError as e:
-        raise ImportError(
-            "PyTorch is required for --train-fusion. Install torch."
-        ) from e
+        raise ImportError("PyTorch is required for --train-fusion. Install torch.") from e
 
     gt_path = resolve_path(
         root, cfg["paths"].get("ground_truth", "data/evaluation/ground_truth.csv")
@@ -47,9 +45,7 @@ def train_learned_fusion(
     cv_index = {cid: i for i, cid in enumerate(mats.cv_ids)}
     job_index = {jid: j for j, jid in enumerate(mats.job_ids)}
 
-    dense = (
-        mats.dense_sim if mats.dense_sim is not None else np.zeros_like(mats.sim_lex)
-    )
+    dense = mats.dense_sim if mats.dense_sim is not None else np.zeros_like(mats.sim_lex)
     bm = mats.bm25 if mats.bm25 is not None else np.zeros_like(mats.sim_lex)
 
     xs: list[list[float]] = []

@@ -38,16 +38,12 @@ def main() -> None:
             (bronze_job / f"{jid}.txt").write_text(job_text, encoding="utf-8")
         if "label" in r or "match" in r:
             rel = int(float(r.get("label", r.get("match", 0))))
-            gt_rows.append(
-                {"job_id": jid, "cv_id": cid, "relevance": max(0, min(3, rel))}
-            )
+            gt_rows.append({"job_id": jid, "cv_id": cid, "relevance": max(0, min(3, rel))})
 
     if gt_rows:
         import pandas as pd
 
-        pd.DataFrame(gt_rows).drop_duplicates().to_csv(
-            eval_dir / "ground_truth.csv", index=False
-        )
+        pd.DataFrame(gt_rows).drop_duplicates().to_csv(eval_dir / "ground_truth.csv", index=False)
     (eval_dir / "import_vacancy_note.json").write_text(
         json.dumps({"samples": len(ds)}, indent=2), encoding="utf-8"
     )

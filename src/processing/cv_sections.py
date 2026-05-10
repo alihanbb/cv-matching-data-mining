@@ -14,9 +14,7 @@ _SECTION_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ),
     (
         "skills",
-        re.compile(
-            r"\b(skills|technologies|tech stack|yetenek|teknik beceriler)\b", re.I
-        ),
+        re.compile(r"\b(skills|technologies|tech stack|yetenek|teknik beceriler)\b", re.I),
     ),
     (
         "experience",

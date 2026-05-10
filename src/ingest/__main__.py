@@ -11,7 +11,7 @@ from .cv_corpus import extra_cvs_from_ingest_config
 
 def main() -> None:
     ap = argparse.ArgumentParser(
-        description="Build Silver CSVs from data/bronze (Bronze → Silver)."
+        description="Build Silver CSVs from data/bronze (Bronze -> Silver)."
     )
     ap.add_argument("--config", type=Path, default=None)
     ap.add_argument("--root", type=Path, default=None, help="Project root (default: auto)")
@@ -38,8 +38,8 @@ def main() -> None:
         pipeline_cfg=cfg,
     )
     print(
-        f"Ingest complete: {n_bronze} bronze + {n_corpus} corpus = {n_bronze + n_corpus} CV rows → {out_cvs}, "
-        f"{n_job} job rows → {out_jobs}"
+        f"Ingest complete: {n_bronze} bronze + {n_corpus} corpus = {n_bronze + n_corpus} "
+        f"CV rows -> {out_cvs}, {n_job} job rows -> {out_jobs}"
     )
 
 

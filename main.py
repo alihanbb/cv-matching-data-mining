@@ -27,9 +27,7 @@ def _apply_best_weights(cfg: dict, root: Path) -> None:
     w = payload.get("weights", {})
     if not w:
         raise ValueError(f"Invalid weights file: {art}")
-    cfg.setdefault("fusion", {})["weights"] = {
-        k: float(v) for k, v in w.items() if k != "bm25"
-    }
+    cfg.setdefault("fusion", {})["weights"] = {k: float(v) for k, v in w.items() if k != "bm25"}
     bm25_v = float(w.get("bm25", 0.0) or 0.0)
     if bm25_v > 0:
         cfg.setdefault("bm25", {})["enabled"] = True
@@ -47,6 +45,7 @@ def main() -> None:
         help="Rebuild Silver CSVs from data/bronze (PDF/DOCX/TXT/MD)",
     )
 
+    # --- Semantic channel -------------------------------------------------
     semantic_group = ap.add_mutually_exclusive_group()
     semantic_group.add_argument(
         "--semantic",
@@ -59,11 +58,12 @@ def main() -> None:
         help="Force-disable dense embeddings (TF-IDF + structured channels only)",
     )
 
+    # --- Evaluation toggle -----------------------------------------------
     eval_group = ap.add_mutually_exclusive_group()
     eval_group.add_argument(
         "--evaluate",
         action="store_true",
-        help="Force-on offline evaluation (requires ground_truth.csv)",
+        help="Run offline metrics when paths.ground_truth exists (skipped with log if missing)",
     )
     eval_group.add_argument(
         "--no-evaluate",
@@ -148,9 +148,7 @@ def main() -> None:
         return
 
     if args.rerank:
-        explain_path = (
-            root / "data" / "gold" / "rankings" / "candidate_scores_explained.csv"
-        )
+        explain_path = root / "data" / "gold" / "rankings" / "candidate_scores_explained.csv"
         if not explain_path.is_file():
             raise FileNotFoundError(
                 f"Missing {explain_path}. Run python main.py (with --bm25 recommended) first."

@@ -62,9 +62,7 @@ def _maybe_unified_jsonl(
         sections = segment_cv(work_text)
         skill_ids = set()
         for part in sections.values():
-            skill_ids |= set(
-                s for s in extract_skill_ids_sets_for_corpus([part], lex)[0]
-            )
+            skill_ids |= set(s for s in extract_skill_ids_sets_for_corpus([part], lex)[0])
         skill_ids |= set(extract_skill_ids_sets_for_corpus([work_text], lex)[0])
         cats = lex.categories_for(skill_ids)
         from src.extraction.experience_extractor import (
@@ -124,9 +122,7 @@ def run_full_pipeline(
     out_rank = resolve_path(root, paths["output_rankings"])
     explain_path = resolve_path(
         root,
-        paths.get(
-            "output_explanations", "data/gold/rankings/candidate_scores_explained.csv"
-        ),
+        paths.get("output_explanations", "data/gold/rankings/candidate_scores_explained.csv"),
     )
     top_candidates_path = resolve_path(
         root,
@@ -134,9 +130,7 @@ def run_full_pipeline(
     )
     eval_results_csv = resolve_path(
         root,
-        paths.get(
-            "evaluation_results_csv", "data/gold/evaluation/evaluation_results.csv"
-        ),
+        paths.get("evaluation_results_csv", "data/gold/evaluation/evaluation_results.csv"),
     )
     model_comparison_csv = resolve_path(
         root,
@@ -144,25 +138,19 @@ def run_full_pipeline(
     )
     score_audit_report_csv = resolve_path(
         root,
-        paths.get(
-            "score_audit_report_csv", "data/gold/evaluation/score_audit_report.csv"
-        ),
+        paths.get("score_audit_report_csv", "data/gold/evaluation/score_audit_report.csv"),
     )
 
     resume_prof_path = resolve_path(
         root,
-        cfg.get("silver", {}).get(
-            "resume_profiles", "data/silver/resume_profiles.jsonl"
-        ),
+        cfg.get("silver", {}).get("resume_profiles", "data/silver/resume_profiles.jsonl"),
     )
 
     if write_unified is None:
         write_unified = bool(cfg.get("silver", {}).get("write_unified_resumes", False))
     unified_path = resolve_path(
         root,
-        cfg.get("silver", {}).get(
-            "unified_resumes", "data/silver/unified_resumes.jsonl"
-        ),
+        cfg.get("silver", {}).get("unified_resumes", "data/silver/unified_resumes.jsonl"),
     )
 
     # ------------------------------------------------------------------
@@ -171,9 +159,7 @@ def run_full_pipeline(
     if ingest:
         ing = cfg.get("ingest", {})
         raw_cvs = resolve_path(root, ing.get("raw_cvs_dir", "data/bronze/cvs"))
-        raw_jobs = resolve_path(
-            root, ing.get("raw_jobs_dir", "data/bronze/job_descriptions")
-        )
+        raw_jobs = resolve_path(root, ing.get("raw_jobs_dir", "data/bronze/job_descriptions"))
         extra_cv = extra_cvs_from_ingest_config(root, ing)
         pre = cfg.get("preprocessing", {})
         n_bronze, n_corpus, n_job = build_processed_from_raw(
@@ -188,7 +174,8 @@ def run_full_pipeline(
             pipeline_cfg=cfg,
         )
         logger.info(
-            "Ingest: %d bronze CV files + %d JSONL corpus rows → %d total CV rows; %d job files → Silver",
+            "Ingest: %d bronze CV files + %d JSONL corpus rows -> %d total CV rows; "
+            "%d job files -> Silver",
             n_bronze,
             n_corpus,
             n_bronze + n_corpus,
@@ -229,9 +216,7 @@ def run_full_pipeline(
         raw_full = read_processed_csv(proc_cvs, "cv_id")
         uc = "raw_text" if "raw_text" in raw_full.columns else "text"
         raw_cvs_df = validate_processed_df(raw_full, "cv_id", uc)
-        _maybe_unified_jsonl(
-            root, raw_cvs_df, lex, cleaner, unified_path, anonymize=anonymize
-        )
+        _maybe_unified_jsonl(root, raw_cvs_df, lex, cleaner, unified_path, anonymize=anonymize)
 
     # ------------------------------------------------------------------
     # Fusion configuration
@@ -271,9 +256,7 @@ def run_full_pipeline(
     # Ranking
     # ------------------------------------------------------------------
     top_k = int(cfg.get("matching", {}).get("top_k", 10))
-    dense_for_components = (
-        m.dense_sim if m.dense_sim is not None else np.zeros_like(m.sim_lex)
-    )
+    dense_for_components = m.dense_sim if m.dense_sim is not None else np.zeros_like(m.sim_lex)
     bm25_for_components = m.bm25 if m.bm25 is not None else np.zeros_like(m.sim_lex)
     components = {
         "tfidf": m.sim_lex,
@@ -369,17 +352,11 @@ def run_full_pipeline(
         renamed["final_score_v2_bm25"] = np.nan
 
     qmap = read_cv_quality_scores(resume_prof_path)
-    renamed["cv_quality_score"] = renamed["cv_id"].map(
-        lambda x: float(qmap.get(str(x), 0.0))
-    )
+    renamed["cv_quality_score"] = renamed["cv_id"].map(lambda x: float(qmap.get(str(x), 0.0)))
 
-    src_series = (
-        m.cvs_df.set_index("cv_id")["source"] if "source" in m.cvs_df.columns else None
-    )
+    src_series = m.cvs_df.set_index("cv_id")["source"] if "source" in m.cvs_df.columns else None
     if src_series is not None:
-        renamed["source"] = renamed["cv_id"].map(
-            lambda x: str(src_series.get(x, "") or "")
-        )
+        renamed["source"] = renamed["cv_id"].map(lambda x: str(src_series.get(x, "") or ""))
     else:
         renamed["source"] = ""
 
@@ -391,10 +368,7 @@ def run_full_pipeline(
         with open(lf_path, encoding="utf-8") as f:
             lw = json.load(f)
         wv = np.array(
-            [
-                float(lw.get(k, 0))
-                for k in ("tfidf", "semantic", "bm25", "skills", "experience")
-            ],
+            [float(lw.get(k, 0)) for k in ("tfidf", "semantic", "bm25", "skills", "experience")],
             dtype=np.float64,
         )
 
@@ -479,7 +453,6 @@ def run_full_pipeline(
         explained.to_csv(explain_path, index=False)
         logger.info("Wrote explainable rankings: %s", explain_path)
 
-        ensure_parent(top_candidates_path)
         top_df = (
             explained.sort_values(["job_id", "rank_for_job"])
             .groupby("job_id", sort=False)
@@ -509,7 +482,12 @@ def run_full_pipeline(
     gt_rel = paths.get("ground_truth")
     if evaluate is False:
         logger.info("Offline evaluation skipped (--no-evaluate).")
-    elif gt_rel:
+    elif not gt_rel:
+        logger.warning(
+            "Evaluation skipped: paths.ground_truth not set "
+            "(expected e.g. data/evaluation/ground_truth.csv)."
+        )
+    else:
         gt_file = resolve_path(root, gt_rel)
         if gt_file.is_file():
             eval_df, comp_df = evaluate_models(root, cfg, semantic=semantic)
@@ -525,13 +503,11 @@ def run_full_pipeline(
                             pass
                 for k, v in metrics.items():
                     logger.info("%s: %.4f", k, v)
-        elif evaluate is True:
-            raise FileNotFoundError(
-                f"Ground truth file not found: {gt_file}\n"
-                "Provide a ground_truth.csv (job_id,cv_id,relevance) before --evaluate."
-            )
         else:
-            logger.warning("Ground truth missing at %s — evaluation skipped.", gt_file)
+            logger.warning(
+                "Evaluation skipped: %s not found.",
+                gt_rel,
+            )
 
     # ------------------------------------------------------------------
     # Run manifest
@@ -551,9 +527,7 @@ def run_full_pipeline(
             cfg,
             artifact_paths,
             metrics,
-            notes=json.dumps(
-                {"dense_enabled": m.dense_enabled, "bm25_enabled": m.bm25_enabled}
-            ),
+            notes=json.dumps({"dense_enabled": m.dense_enabled, "bm25_enabled": m.bm25_enabled}),
         )
 
     logger.info("Wrote rankings: %s", out_rank)

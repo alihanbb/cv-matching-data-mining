@@ -168,16 +168,10 @@ def write_silver_artifacts(
     resume_prof = resolve_path(
         root, silver_cfg.get("resume_profiles", "data/silver/resume_profiles.jsonl")
     )
-    job_prof = resolve_path(
-        root, silver_cfg.get("job_profiles", "data/silver/job_profiles.jsonl")
-    )
-    stats_path = resolve_path(
-        root, silver_cfg.get("stats_path", "data/silver/silver_stats.json")
-    )
+    job_prof = resolve_path(root, silver_cfg.get("job_profiles", "data/silver/job_profiles.jsonl"))
+    stats_path = resolve_path(root, silver_cfg.get("stats_path", "data/silver/silver_stats.json"))
 
-    lex_path = resolve_path(
-        root, cfg.get("skills", {}).get("path", "config/skills.yaml")
-    )
+    lex_path = resolve_path(root, cfg.get("skills", {}).get("path", "config/skills.yaml"))
     lex = load_skills_lexicon(lex_path)
     pre = cfg.get("preprocessing", {})
     cleaner = TextCleaner(
@@ -237,9 +231,7 @@ def write_silver_artifacts(
         },
     }
     ensure_parent(stats_path)
-    stats_path.write_text(
-        json.dumps(stats, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
+    stats_path.write_text(json.dumps(stats, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     logger.info("Silver artifact stats: %s", stats_path)
     return stats
 

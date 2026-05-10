@@ -18,9 +18,7 @@ def minmax_per_column(matrix: np.ndarray, eps: float = 1e-12) -> np.ndarray:
     return out
 
 
-def skill_jaccard_matrix(
-    cv_sets: list[set[str]], job_sets: list[set[str]]
-) -> np.ndarray:
+def skill_jaccard_matrix(cv_sets: list[set[str]], job_sets: list[set[str]]) -> np.ndarray:
     n_c, n_j = len(cv_sets), len(job_sets)
     s = np.zeros((n_c, n_j), dtype=np.float64)
     for i in range(n_c):

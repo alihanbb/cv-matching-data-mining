@@ -11,9 +11,7 @@ def test_validate_processed():
 
 
 def test_ground_truth_accepts_graded_labels():
-    df = pd.DataFrame(
-        {"cv_id": [1, 2, 3, 4], "job_id": [10, 10, 11, 11], "relevant": [0, 1, 2, 3]}
-    )
+    df = pd.DataFrame({"cv_id": [1, 2, 3, 4], "job_id": [10, 10, 11, 11], "relevant": [0, 1, 2, 3]})
     out = validate_ground_truth_df(df)
     assert sorted(out["relevant"].tolist()) == [0, 1, 2, 3]
 

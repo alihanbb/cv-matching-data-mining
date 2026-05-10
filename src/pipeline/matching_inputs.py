@@ -129,17 +129,13 @@ def build_matching_matrices(
     cvs = validate_processed_df(raw_cvs, "cv_id", cv_text_col)
     jobs = validate_processed_df(raw_jobs, "job_id", job_text_col)
     if "source" in raw_cvs.columns:
-        src_df = raw_cvs[["cv_id", "source"]].drop_duplicates(
-            subset=["cv_id"], keep="first"
-        )
+        src_df = raw_cvs[["cv_id", "source"]].drop_duplicates(subset=["cv_id"], keep="first")
         cvs = cvs.merge(src_df, on="cv_id", how="left")
         cvs["source"] = cvs["source"].fillna("").astype(str)
     else:
         cvs["source"] = ""
     if "source" in raw_jobs.columns:
-        js_df = raw_jobs[["job_id", "source"]].drop_duplicates(
-            subset=["job_id"], keep="first"
-        )
+        js_df = raw_jobs[["job_id", "source"]].drop_duplicates(subset=["job_id"], keep="first")
         jobs = jobs.merge(js_df, on="job_id", how="left")
         jobs["source"] = jobs["source"].fillna("").astype(str)
     else:
@@ -151,12 +147,8 @@ def build_matching_matrices(
     if cvs.empty or jobs.empty:
         raise ValueError("Processed CV or job tables are empty — run ingest first.")
 
-    src_cv_text = cvs["text"].map(
-        lambda t: anonymize_text(str(t)) if anonymize else str(t)
-    )
-    src_job_text = jobs["text"].map(
-        lambda t: anonymize_text(str(t)) if anonymize else str(t)
-    )
+    src_cv_text = cvs["text"].map(lambda t: anonymize_text(str(t)) if anonymize else str(t))
+    src_job_text = jobs["text"].map(lambda t: anonymize_text(str(t)) if anonymize else str(t))
     cvs = cvs.assign(_work_text=src_cv_text)
     jobs = jobs.assign(_work_text=src_job_text)
     cvs["clean_text"] = cvs["_work_text"].map(cleaner.clean)
@@ -167,25 +159,18 @@ def build_matching_matrices(
 
     # Skill extraction
     cv_skill_sets = extract_skill_ids_sets_for_corpus(cvs["_work_text"].tolist(), lex)
-    job_reqs = [
-        extract_job_requirements(str(t), lex) for t in jobs["_work_text"].tolist()
-    ]
+    job_reqs = [extract_job_requirements(str(t), lex) for t in jobs["_work_text"].tolist()]
     job_skill_sets = [r.must_have | r.nice_to_have for r in job_reqs]
 
     # Coverage matrices
-    must_cov_m, nice_cov_m, skill_score_m = requirement_coverage_matrix(
-        cv_skill_sets, job_reqs
-    )
+    must_cov_m, nice_cov_m, skill_score_m = requirement_coverage_matrix(cv_skill_sets, job_reqs)
     jaccard_mat = skill_jaccard_matrix(cv_skill_sets, job_skill_sets)
 
     # Experience
     cv_years_list = [
-        float(cv_max_years(extract_experience_signals(str(t))))
-        for t in cvs["_work_text"].tolist()
+        float(cv_max_years(extract_experience_signals(str(t)))) for t in cvs["_work_text"].tolist()
     ]
-    job_req_years = [
-        extract_job_required_years(str(t)) for t in jobs["_work_text"].tolist()
-    ]
+    job_req_years = [extract_job_required_years(str(t)) for t in jobs["_work_text"].tolist()]
     exp_mat = experience_match_matrix(cv_years_list, job_req_years)
 
     # TF-IDF
@@ -216,9 +201,7 @@ def build_matching_matrices(
             logger.warning("Semantic encoder unavailable — dense channel disabled.")
         else:
             bs = int(emb_cfg.get("batch_size", DEFAULT_EMBEDDING_BATCH_SIZE))
-            logger.info(
-                "Encoding %d CVs and %d jobs with dense model", len(cvs), len(jobs)
-            )
+            logger.info("Encoding %d CVs and %d jobs with dense model", len(cvs), len(jobs))
             e_cv = encode_normalized(model, cvs["clean_text"].tolist(), bs)
             e_job = encode_normalized(model, jobs["clean_text"].tolist(), bs)
             dense_sim = np.clip(dense_cosine_similarity(e_cv, e_job), 0.0, 1.0)
@@ -229,9 +212,7 @@ def build_matching_matrices(
     bm25_enabled = bool(bm25 or bm25_cfg.get("enabled", False))
     if bm25_enabled:
         try:
-            bm25_mat = bm25_matrix(
-                jobs["clean_text"].tolist(), cvs["clean_text"].tolist()
-            )
+            bm25_mat = bm25_matrix(jobs["clean_text"].tolist(), cvs["clean_text"].tolist())
         except ImportError as exc:
             logger.warning("BM25 unavailable — channel disabled: %s", exc)
             bm25_enabled = False

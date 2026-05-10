@@ -1,3 +1,6 @@
+# =============================================================================
+# Paths — processed corpora, model artifacts, outputs
+# =============================================================================
 paths:
   processed_cvs: data/silver/cleaned_cvs.csv
   processed_jobs: data/silver/cleaned_jobs.csv
@@ -13,28 +16,35 @@ paths:
 skills:
   path: config/skills.yaml
 
+# =============================================================================
+# Ingest — Bronze → Silver preference order (JSONL first, folders fallback)
+# =============================================================================
 ingest:
   raw_cvs_dir: data/bronze/cvs
   raw_jobs_dir: data/bronze/job_descriptions
   bronze_resumes_jsonl: data/bronze/resumes/resumes_bronze.jsonl
   bronze_jobs_jsonl: data/bronze/jobs/jobs_bronze.jsonl
-  # Restricts CV rows loaded from Bronze JSONL / optional corpus JSONL to ranking candidates.
+
+  # Non-empty: only these ``source`` tags enter ranking corpus (JSONL + optional corpus JSONL).
   ranking_sources:
     - vacancy_resume_matching
     - sample
     - huggingface_cv_matcher
-  # NER-labelled sources: profiled for Silver / corpus, not used alone as ranking candidates when filtered out above.
+
+  # Extra NER sources → Silver profiling via JSONL (see cv_corpus_jsonl.path); not standalone ranking buckets.
   ner_corpus_sources:
     - dataturks_resume_ner_train
     - dataturks_resume_ner_test
     - mehyar_ner_annotated_cv
     - nlp_ner_on_resume_json_demo
+
   cv_corpus_jsonl:
     enabled: true
     path: data/silver/unified_resumes.jsonl
     id_field: record_id
     text_field: text
     id_prefix: corpus_
+    # Single cap on JSONL corpus rows loaded for ranking augmentation (omit or null = unlimited).
     max_rows: 12000
 
 silver:

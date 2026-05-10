@@ -71,9 +71,7 @@ class IngestConfig(BaseModel):
     bronze_jobs_jsonl: str = "data/bronze/jobs/jobs_bronze.jsonl"
     ranking_sources: list[str] = Field(default_factory=list)
     ner_corpus_sources: list[str] = Field(default_factory=list)
-    cv_corpus_jsonl: IngestCvCorpusJsonlConfig = Field(
-        default_factory=IngestCvCorpusJsonlConfig
-    )
+    cv_corpus_jsonl: IngestCvCorpusJsonlConfig = Field(default_factory=IngestCvCorpusJsonlConfig)
 
 
 class SilverConfig(BaseModel):
@@ -136,9 +134,7 @@ class Bm25Config(BaseModel):
 class FusionWeightsConfig(BaseModel):
     """V1 fusion weights — no BM25 channel."""
 
-    model_config = {
-        "extra": "allow"
-    }  # allow extra channel keys set by weight optimiser
+    model_config = {"extra": "allow"}  # allow extra channel keys set by weight optimiser
 
     tfidf: float = Field(default=0.35, ge=0.0, le=1.0)
     dense: float = Field(default=0.35, ge=0.0, le=1.0)
@@ -185,9 +181,7 @@ class EvaluationConfig(BaseModel):
     @classmethod
     def _check_ks(cls, v: list[int]) -> list[int]:
         if not v or any(k < 1 for k in v):
-            raise ValueError(
-                "top_k_values must be a non-empty list of positive integers"
-            )
+            raise ValueError("top_k_values must be a non-empty list of positive integers")
         return v
 
 

@@ -54,17 +54,9 @@ def suggested_improvements_text(
     if missing_critical:
         sug.append(f"Öne çıkarın veya edinin: {missing_critical.replace(';', ', ')}.")
     if missing_optional:
-        sug.append(
-            f"İsteğe bağlı güçlü sinyaller: {missing_optional.replace(';', ', ')}."
-        )
+        sug.append(f"İsteğe bağlı güçlü sinyaller: {missing_optional.replace(';', ', ')}.")
     if semantic_sim < SEMANTIC_LOW_THRESHOLD:
-        sug.append(
-            "Özet ve deneyim bölümlerini ilan diline ve anahtar kelimelere yaklaştırın."
-        )
+        sug.append("Özet ve deneyim bölümlerini ilan diline ve anahtar kelimelere yaklaştırın.")
     if "eksik" in exp_note or "gerekli" in exp_note:
         sug.append("Deneyim yılını net tarih aralıklarıyla gösterin.")
-    return (
-        " ".join(sug)
-        if sug
-        else "Güçlü görünüyor; ölçülebilir sonuçlar eklemeye devam edin."
-    )
+    return " ".join(sug) if sug else "Güçlü görünüyor; ölçülebilir sonuçlar eklemeye devam edin."

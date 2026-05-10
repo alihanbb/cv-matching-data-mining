@@ -61,9 +61,7 @@ def main() -> None:
             text = f"{title}\n\n{body}".strip() if title else body
             if not text:
                 continue
-            (bronze_jobs / f"vanetik_vacancy_{jid}.txt").write_text(
-                text, encoding="utf-8"
-            )
+            (bronze_jobs / f"vanetik_vacancy_{jid}.txt").write_text(text, encoding="utf-8")
             n_jobs += 1
 
     note = {

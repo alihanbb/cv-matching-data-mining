@@ -51,7 +51,5 @@ def skill_ids_to_display(ids: Iterable[str], lex: SkillsLexicon) -> list[str]:
     return out
 
 
-def extract_skill_ids_sets_for_corpus(
-    texts: list[str], lex: SkillsLexicon
-) -> list[set[str]]:
+def extract_skill_ids_sets_for_corpus(texts: list[str], lex: SkillsLexicon) -> list[set[str]]:
     return [set(extract_skill_ids(t, lex)) for t in texts]

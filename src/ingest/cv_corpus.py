@@ -23,9 +23,7 @@ def load_cv_rows_from_jsonl(
     if not path.is_file():
         logger.warning("CV corpus JSONL not found, skipped: %s", path)
         return []
-    allow_src = {
-        str(s).strip() for s in (source_allowlist or []) if str(s).strip()
-    } or None
+    allow_src = {str(s).strip() for s in (source_allowlist or []) if str(s).strip()} or None
     rows: list[dict[str, str]] = []
     with open(path, encoding="utf-8") as f:
         for line in f:
@@ -70,18 +68,14 @@ def load_cv_rows_from_jsonl(
             cid = f"{id_prefix}{rid}" if id_prefix else rid
             sfile = str(obj.get("source_file", "") or "").strip()
             sour = str(obj.get("source", "") or "").strip()
-            rows.append(
-                {"cv_id": cid, "text": stext, "source": sour, "source_file": sfile}
-            )
+            rows.append({"cv_id": cid, "text": stext, "source": sour, "source_file": sfile})
             if max_rows is not None and len(rows) >= int(max_rows):
                 break
     logger.info("Loaded %d CV rows from JSONL corpus: %s", len(rows), path)
     return rows
 
 
-def extra_cvs_from_ingest_config(
-    root: Path, ingest_cfg: dict[str, Any]
-) -> list[dict[str, str]]:
+def extra_cvs_from_ingest_config(root: Path, ingest_cfg: dict[str, Any]) -> list[dict[str, str]]:
     """Optional JSONL résumé corpus (paths relative to project root)."""
     ds = ingest_cfg.get("cv_corpus_jsonl") or {}
     if not ds.get("enabled", False):
