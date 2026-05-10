@@ -13,6 +13,7 @@ from src.utils.dashboard_ranking import (
     RANKING_SOURCE_TAGS,
     prepare_candidate_ranking_view,
 )
+from src.utils.candidate_dedup import dedupe_candidates_by_canonical_cv_id
 from src.utils.id_normalization import normalize_cv_id, normalize_job_id
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -230,7 +231,25 @@ def tab_profile(cvs_silver: pd.DataFrame) -> None:
 def tab_coverage(rankings: pd.DataFrame) -> None:
     st.subheader("Requirement coverage")
     job = st.selectbox("Job (coverage)", sorted(rankings["job_id"].astype(str).unique()), key="cov_job")
-    block = rankings[rankings["job_id"].astype(str) == job].sort_values("rank_for_job").head(10)
+    cov_score_cols = [
+        c
+        for c in ("ranking_score", "final_score_v2_bm25", "final_score", "learned_fusion_score")
+        if c in rankings.columns
+    ]
+    cov_score = st.selectbox(
+        "Coverage score column",
+        cov_score_cols or ["ranking_score"],
+        key="cov_score_col",
+    )
+    block = prepare_candidate_ranking_view(
+        rankings,
+        job_id=job,
+        score_column=cov_score,
+        top_n=10,
+        include_ner_sources=False,
+        ranking_sources=RANKING_SOURCE_TAGS,
+        ner_sources=NER_SOURCE_TAGS,
+    )
     cols = [
         "cv_id",
         "must_have_coverage",
@@ -259,14 +278,45 @@ def tab_comparison() -> None:
 
 def tab_debug(rankings: pd.DataFrame) -> None:
     st.subheader("Score debug")
+    debug_score_cols = [
+        c
+        for c in ("ranking_score", "final_score_v2_bm25", "final_score", "learned_fusion_score")
+        if c in rankings.columns
+    ]
+    debug_score = st.selectbox(
+        "Debug ranking score",
+        debug_score_cols or ["ranking_score"],
+        key="debug_score_col",
+    )
+    dedup = dedupe_candidates_by_canonical_cv_id(
+        rankings,
+        score_column=debug_score,
+        keep_canonical_column=False,
+    )
     for col in ("final_score_raw", "score_check", "score_diff", "score_warning"):
-        if col not in rankings.columns:
-            rankings[col] = None
-    zero_ratio = float((rankings["semantic_score"].astype(float).abs() < 1e-9).mean()) if "semantic_score" in rankings.columns else 0.0
+        if col not in dedup.columns:
+            dedup[col] = None
+    zero_ratio = (
+        float((dedup["semantic_score"].astype(float).abs() < 1e-9).mean())
+        if "semantic_score" in dedup.columns
+        else 0.0
+    )
     st.metric("Semantic score zero ratio", f"{zero_ratio:.1%}")
     st.dataframe(
-        rankings[
-            [c for c in ("job_id", "cv_id", "final_score_raw", "score_check", "score_diff", "score_warning", "semantic_score") if c in rankings.columns]
+        dedup[
+            [
+                c
+                for c in (
+                    "job_id",
+                    "cv_id",
+                    "final_score_raw",
+                    "score_check",
+                    "score_diff",
+                    "score_warning",
+                    "semantic_score",
+                )
+                if c in dedup.columns
+            ]
         ].head(50)
     )
 

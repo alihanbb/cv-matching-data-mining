@@ -14,6 +14,13 @@ from src.evaluation.ranking_metrics import (
     mean_reciprocal_rank,
     ndcg_at_k,
 )
+from src.models.learned_fusion import (
+    DEFAULT_FEATURE_COLS,
+    export_learned_fusion_weights_json,
+    predict_learned_fusion,
+    save_learned_fusion_model,
+    train_learned_fusion,
+)
 from src.pipeline.matching_inputs import (
     MatchingMatrices,
     build_matching_matrices,
@@ -21,6 +28,7 @@ from src.pipeline.matching_inputs import (
 )
 from src.schemas.documents import validate_ground_truth_df
 from src.scoring.fusion import fuse_weighted_raw
+from src.utils.candidate_dedup import dedupe_candidates_by_canonical_cv_id
 from src.utils.helpers import ensure_parent, resolve_path
 from src.utils.id_normalization import normalize_cv_id, normalize_job_id
 
@@ -35,23 +43,19 @@ def _normalize_ranked_ids(ranked: pd.DataFrame) -> pd.DataFrame:
     if out.empty:
         return out
 
-    score_col = "score" if "score" in out.columns else None
-    if score_col is not None:
-        out[score_col] = pd.to_numeric(out[score_col], errors="coerce")
-        out = out.dropna(subset=[score_col])
-        out = out.sort_values(["job_id", score_col], ascending=[True, False], kind="mergesort")
+    if "score" in out.columns:
+        score_col = "score"
+    elif "rank_for_job" in out.columns:
+        out["score"] = -pd.to_numeric(out["rank_for_job"], errors="coerce")
+        score_col = "score"
     else:
-        out["rank_for_job"] = pd.to_numeric(out["rank_for_job"], errors="coerce")
-        out = out.dropna(subset=["rank_for_job"])
-        out = out.sort_values(["job_id", "rank_for_job"], ascending=[True, True], kind="mergesort")
-
-    out = out.drop_duplicates(subset=["job_id", "cv_id"], keep="first")
-    if score_col is not None:
-        out = out.sort_values(["job_id", score_col], ascending=[True, False], kind="mergesort")
-    else:
-        out = out.sort_values(["job_id", "rank_for_job"], ascending=[True, True], kind="mergesort")
-    out["rank_for_job"] = out.groupby("job_id").cumcount() + 1
-    return out
+        out["score"] = 0.0
+        score_col = "score"
+    return dedupe_candidates_by_canonical_cv_id(
+        out,
+        score_column=score_col,
+        keep_canonical_column=False,
+    )
 
 
 def _log_gt_alignment(model_name: str, ranked: pd.DataFrame, ground_truth: pd.DataFrame) -> None:
@@ -84,6 +88,8 @@ def _rank_tfidf_baseline(m: MatchingMatrices, top_k: int) -> pd.DataFrame:
 
 
 def _rank_semantic_only(m: MatchingMatrices, top_k: int) -> pd.DataFrame:
+    if not m.dense_enabled or m.dense_sim is None:
+        return _rank_tfidf_baseline(m, top_k)
     w = {"tfidf": 0.0, "dense": 1.0, "skills": 0.0, "experience": 0.0}
     fused, _ = fuse_weighted_raw(
         m.sim_lex, m.dense_sim, m.skill_score, m.exp_mat, w, m.dense_enabled, bm25=None
@@ -145,6 +151,60 @@ def _rank_optimized(m: MatchingMatrices, top_k: int, root: Path) -> pd.DataFrame
     return rankings_from_fused(fused, m.cv_ids, m.job_ids, top_k)
 
 
+def _rank_from_score_df(scored_df: pd.DataFrame, score_col: str, top_k: int) -> pd.DataFrame:
+    if score_col not in scored_df.columns:
+        return pd.DataFrame(columns=["job_id", "cv_id", "score", "rank_for_job"])
+    ranked = scored_df[["job_id", "cv_id", score_col]].rename(columns={score_col: "score"}).copy()
+    ranked = _normalize_ranked_ids(ranked)
+    ranked = ranked.sort_values(["job_id", "score"], ascending=[True, False], kind="mergesort")
+    ranked["rank_for_job"] = ranked.groupby("job_id").cumcount() + 1
+    ranked = ranked.groupby("job_id", sort=False).head(top_k).reset_index(drop=True)
+    return ranked
+
+
+def _maybe_rank_learned_fusion(
+    root: Path,
+    cfg: dict[str, Any],
+    gt: pd.DataFrame,
+    top_k: int,
+) -> pd.DataFrame | None:
+    paths_cfg = cfg.get("paths", {})
+    explained_path = resolve_path(
+        root,
+        paths_cfg.get("output_explanations", "data/gold/rankings/candidate_scores_explained.csv"),
+    )
+    if not explained_path.is_file():
+        return None
+
+    scores_df = pd.read_csv(explained_path)
+    if "learned_fusion_score" not in scores_df.columns or scores_df["learned_fusion_score"].isna().all():
+        try:
+            model = train_learned_fusion(
+                scores_df,
+                gt,
+                feature_cols=list(DEFAULT_FEATURE_COLS),
+                target_col="relevant",
+                epochs=100,
+                lr=0.01,
+            )
+        except ValueError as exc:
+            logger.warning("Learned fusion evaluation skipped: %s", exc)
+            return None
+
+        model_path = resolve_path(root, "artifacts/models/learned_fusion.pt")
+        weights_path = resolve_path(root, "artifacts/models/learned_fusion_weights.json")
+        save_learned_fusion_model(model, model_path)
+        export_learned_fusion_weights_json(model, list(DEFAULT_FEATURE_COLS), weights_path)
+        scores_df["learned_fusion_score"] = predict_learned_fusion(
+            scores_df, model, feature_cols=list(DEFAULT_FEATURE_COLS)
+        )
+        scores_df.to_csv(explained_path, index=False)
+
+    if scores_df["learned_fusion_score"].isna().all():
+        return None
+    return _rank_from_score_df(scores_df, "learned_fusion_score", top_k)
+
+
 def evaluate_models(
     root: Path,
     cfg: dict[str, Any],
@@ -177,6 +237,9 @@ def evaluate_models(
     art = resolve_path(root, "artifacts/best_fusion_weights.json")
     if art.is_file():
         spec.append(("Optimized Fusion", _rank_optimized(m_bm25, top_k, root)))
+    lf_ranked = _maybe_rank_learned_fusion(root, cfg, gt, top_k)
+    if lf_ranked is not None and not lf_ranked.empty:
+        spec.append(("Learned Fusion", lf_ranked))
 
     eval_rows: list[dict[str, Any]] = []
     comp_rows: list[dict[str, Any]] = []

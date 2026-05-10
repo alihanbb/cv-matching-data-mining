@@ -19,6 +19,13 @@ from src.extraction.skills_lexicon import load_skills_lexicon
 from src.features.tfidf_vectorizer import TfidfFeatureBuilder
 from src.ingest.build_processed import build_processed_from_raw
 from src.ingest.cv_corpus import extra_cvs_from_ingest_config
+from src.models.learned_fusion import (
+    DEFAULT_FEATURE_COLS,
+    export_learned_fusion_weights_json,
+    predict_learned_fusion,
+    save_learned_fusion_model,
+    train_learned_fusion,
+)
 from src.models.matcher import enrich_detailed, rank_candidates_for_jobs
 from src.pipeline.io import read_processed_csv
 from src.pipeline.matching_inputs import build_matching_matrices
@@ -29,10 +36,11 @@ from src.processing.cv_sections import (
     segment_cv,
     write_unified_resumes_jsonl,
 )
-from src.schemas.documents import validate_processed_df
+from src.schemas.documents import validate_ground_truth_df, validate_processed_df
 from src.scoring.fusion import fuse_scores, fuse_weighted_raw
 from src.scoring.score_audit import weighted_fusion_v1_row
 from src.silver.build import read_cv_quality_scores
+from src.utils.candidate_dedup import dedupe_candidates_by_canonical_cv_id
 from src.utils.experiment import write_run_manifest
 from src.utils.helpers import ensure_parent, resolve_path
 from src.utils.id_normalization import normalize_cv_id, normalize_job_id
@@ -365,44 +373,44 @@ def run_full_pipeline(
     else:
         renamed["source"] = ""
 
-    # Guarantee one canonical candidate per (job_id, cv_id) and recompute rank.
-    if not renamed.empty:
-        renamed = renamed.sort_values(
-            by=["job_id", "ranking_score", "cv_id"], ascending=[True, False, True], kind="mergesort"
-        )
-        renamed = renamed.drop_duplicates(subset=["job_id", "cv_id"], keep="first")
-        renamed["rank_for_job"] = renamed.groupby("job_id").cumcount() + 1
+    # Gold-level dedup: keep best row per (job_id, canonical_cv_id) by main ranking score.
+    renamed = dedupe_candidates_by_canonical_cv_id(
+        renamed,
+        score_column="ranking_score",
+        keep_canonical_column=False,
+    )
 
     # ------------------------------------------------------------------
-    # Optional learned fusion score
+    # Learned fusion score (additional model; V1/V2 unchanged)
     # ------------------------------------------------------------------
-    lf_path = resolve_path(root, "artifacts/learned_fusion_weights.json")
-    if lf_path.is_file():
-        with open(lf_path, encoding="utf-8") as f:
-            lw = json.load(f)
-        wv = np.array(
-            [float(lw.get(k, 0)) for k in ("tfidf", "semantic", "bm25", "skills", "experience")],
-            dtype=np.float64,
-        )
-
-        def _lf_row(r: pd.Series) -> float:
-            v = np.array(
-                [
-                    float(r.get(k, 0))
-                    for k in (
-                        "tfidf_score",
-                        "semantic_score",
-                        "bm25_score",
-                        "skill_score",
-                        "experience_score",
-                    )
-                ],
-                dtype=np.float64,
+    gt_rel = paths.get("ground_truth", "data/evaluation/ground_truth.csv")
+    gt_file = resolve_path(root, gt_rel)
+    lf_model_path = resolve_path(root, "artifacts/models/learned_fusion.pt")
+    lf_weights_path = resolve_path(root, "artifacts/models/learned_fusion_weights.json")
+    if gt_file.is_file():
+        try:
+            gt_df = validate_ground_truth_df(pd.read_csv(gt_file))
+            if gt_df.empty:
+                raise ValueError("Ground truth is empty after validation.")
+            lf_model = train_learned_fusion(
+                renamed,
+                gt_df,
+                feature_cols=list(DEFAULT_FEATURE_COLS),
+                target_col="relevant",
+                epochs=100,
+                lr=0.01,
             )
-            return float((v * wv).sum())
-
-        renamed["learned_fusion_score"] = renamed.apply(_lf_row, axis=1)
+            save_learned_fusion_model(lf_model, lf_model_path)
+            export_learned_fusion_weights_json(lf_model, list(DEFAULT_FEATURE_COLS), lf_weights_path)
+            renamed["learned_fusion_score"] = predict_learned_fusion(
+                renamed, lf_model, feature_cols=list(DEFAULT_FEATURE_COLS)
+            )
+            logger.info("Learned fusion model artifacts saved: %s, %s", lf_model_path, lf_weights_path)
+        except ValueError as exc:
+            logger.warning("Learned fusion training skipped: %s", exc)
+            renamed["learned_fusion_score"] = np.nan
     else:
+        logger.info("Learned fusion training skipped: ground_truth.csv not found.")
         renamed["learned_fusion_score"] = np.nan
 
     # ------------------------------------------------------------------
