@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 import pandas as pd
 
 from src.utils.id_normalization import normalize_cv_id, normalize_job_id
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_FEATURE_COLS: list[str] = [
     "tfidf_score",
@@ -69,6 +72,21 @@ def prepare_training_data(
     gt = _normalize_gt_df(ground_truth_df, target_col=target_col)
     merged = gt.merge(score, on=["job_id", "cv_id"], how="inner")
     merged = merged.dropna(subset=[target_col])
+    total_gt = int(len(gt))
+    matched_gt = int(len(merged[["job_id", "cv_id"]].drop_duplicates()))
+    unmatched_gt = total_gt - matched_gt
+    logger.info(
+        "Learned fusion training alignment: total_ground_truth_rows=%d matched_ground_truth_rows=%d unmatched_ground_truth_rows=%d",
+        total_gt,
+        matched_gt,
+        unmatched_gt,
+    )
+    if total_gt > 0 and (matched_gt / total_gt) < 0.10:
+        logger.warning(
+            "Learned fusion training alignment is very low (matched_ground_truth_rows=%d/%d).",
+            matched_gt,
+            total_gt,
+        )
     return merged
 
 
@@ -112,12 +130,15 @@ def train_learned_fusion(
     criterion = nn.MSELoss()
 
     model.train()
-    for _ in range(int(epochs)):
+    n_epochs = int(epochs)
+    for epoch in range(1, n_epochs + 1):
         optimizer.zero_grad()
         pred = model(X)
         loss = criterion(pred, y)
         loss.backward()
         optimizer.step()
+        if epoch == 1 or epoch == n_epochs or (epoch % 10 == 0):
+            logger.info("Learned fusion epoch %d/%d loss=%.6f", epoch, n_epochs, float(loss.item()))
     return model
 
 
@@ -183,3 +204,6 @@ def export_learned_fusion_weights_json(model, feature_cols: list[str], path: Pat
         json.dump(payload, f, indent=2)
     return payload
 
+
+def export_learned_fusion_weights(model, feature_cols: list[str], path: Path) -> dict[str, float]:
+    return export_learned_fusion_weights_json(model, feature_cols, path)

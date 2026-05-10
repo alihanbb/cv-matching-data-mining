@@ -187,7 +187,7 @@ def _maybe_rank_learned_fusion(
                 epochs=100,
                 lr=0.01,
             )
-        except ValueError as exc:
+        except (ValueError, ImportError) as exc:
             logger.warning("Learned fusion evaluation skipped: %s", exc)
             return None
 

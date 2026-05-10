@@ -6,6 +6,7 @@ import pandas as pd
 
 from src.models.learned_fusion import (
     DEFAULT_FEATURE_COLS,
+    prepare_training_data,
     predict_learned_fusion,
     train_learned_fusion,
 )
@@ -107,23 +108,56 @@ def test_train_and_predict_learned_fusion() -> None:
     assert ((preds >= 0.0) & (preds <= 1.0)).all()
 
 
-def test_pipeline_skips_learned_fusion_when_ground_truth_missing(tmp_path: Path) -> None:
+def test_prepare_training_data_normalizes_ids_and_relevance() -> None:
+    scores_df = pd.DataFrame(
+        {
+            "job_id": ["job_1", "job_1"],
+            "cv_id": ["corpus_candidate_1", "candidate_2"],
+            "tfidf_score": [0.8, 0.4],
+            "semantic_score": [None, 0.2],
+            "bm25_score": [0.3, None],
+            "skill_score": [0.7, 0.1],
+            "experience_score": [0.6, 0.2],
+            "must_have_coverage": [1.0, None],
+        }
+    )
+    gt_df = pd.DataFrame(
+        {
+            "job_id": ["job_1", "job_1", "job_1"],
+            "resume_id": ["candidate_1", "candidate_2", "candidate_999"],
+            "relevance": [3, 1, 2],
+        }
+    )
+    merged = prepare_training_data(scores_df, gt_df, feature_cols=list(DEFAULT_FEATURE_COLS))
+    assert set(merged["cv_id"].tolist()) == {"candidate_1", "candidate_2"}
+    assert set(merged["relevance"].tolist()) == {1.0, 0.33}
+    assert not merged[list(DEFAULT_FEATURE_COLS)].isna().any().any()
+
+
+def test_pipeline_skips_learned_fusion_when_ground_truth_missing(
+    tmp_path: Path, caplog
+) -> None:
     _write_minimal_processed_tables(tmp_path)
     cfg = _base_cfg(tmp_path)
     # Do not create ground_truth.csv on purpose.
+    caplog.set_level("WARNING")
     run_full_pipeline(tmp_path, cfg, ingest=False, semantic=False, evaluate=False, bm25=False)
     out = pd.read_csv(tmp_path / "data" / "gold" / "rankings" / "candidate_scores_explained.csv")
     assert "learned_fusion_score" in out.columns
     assert out["learned_fusion_score"].isna().all()
+    assert any("Learned fusion training skipped:" in r.message and "not found." in r.message for r in caplog.records)
 
 
-def test_model_comparison_contains_learned_fusion_row(tmp_path: Path) -> None:
+def test_model_comparison_contains_learned_fusion_row(tmp_path: Path, caplog) -> None:
     _write_minimal_processed_tables(tmp_path)
     _write_ground_truth(tmp_path)
     cfg = _base_cfg(tmp_path)
+    cfg["logging"]["level"] = "INFO"
+    caplog.set_level("INFO")
     run_full_pipeline(tmp_path, cfg, ingest=False, semantic=False, evaluate=True, bm25=False)
     comp = pd.read_csv(tmp_path / "data" / "gold" / "evaluation" / "model_comparison.csv")
     assert "Learned Fusion" in set(comp["model"].tolist())
+    assert any("evaluation alignment:" in r.message for r in caplog.records)
 
 
 def test_pipeline_writes_learned_fusion_score_column_when_ground_truth_exists(tmp_path: Path) -> None:
@@ -136,4 +170,3 @@ def test_pipeline_writes_learned_fusion_score_column_when_ground_truth_exists(tm
     vals = explained["learned_fusion_score"].dropna()
     assert not vals.empty
     assert ((vals >= 0.0) & (vals <= 1.0)).all()
-

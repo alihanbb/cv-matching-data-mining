@@ -70,3 +70,45 @@ def dedupe_candidates_by_canonical_cv_id(
         out = out.drop(columns=["canonical_cv_id"], errors="ignore")
     return out
 
+
+def dedupe_candidates_by_job_cv_id(
+    df: pd.DataFrame,
+    *,
+    score_column: str,
+) -> pd.DataFrame:
+    """Keep best row per exact (job_id, cv_id) pair and recompute rank_for_job."""
+    if df.empty:
+        return df.copy()
+
+    out = df.copy()
+    out["job_id"] = out["job_id"].map(normalize_job_id)
+    out["cv_id"] = out["cv_id"].map(normalize_cv_id)
+    out = out[(out["job_id"] != "") & (out["cv_id"] != "")]
+    if out.empty:
+        return out
+
+    score_col = resolve_score_column(out, score_column)
+    out[score_col] = pd.to_numeric(out.get(score_col), errors="coerce")
+    out = out.dropna(subset=[score_col])
+    if out.empty:
+        return out
+
+    if "rank_for_job" in out.columns:
+        out["_rank_old"] = pd.to_numeric(out["rank_for_job"], errors="coerce").fillna(10**9)
+    else:
+        out["_rank_old"] = 10**9
+
+    out = out.sort_values(
+        by=["job_id", score_col, "_rank_old", "cv_id"],
+        ascending=[True, False, True, True],
+        kind="mergesort",
+    )
+    out = out.drop_duplicates(subset=["job_id", "cv_id"], keep="first")
+    out = out.sort_values(
+        by=["job_id", score_col, "_rank_old", "cv_id"],
+        ascending=[True, False, True, True],
+        kind="mergesort",
+    )
+    out["rank_for_job"] = out.groupby("job_id").cumcount() + 1
+    out = out.drop(columns=["_rank_old"], errors="ignore")
+    return out

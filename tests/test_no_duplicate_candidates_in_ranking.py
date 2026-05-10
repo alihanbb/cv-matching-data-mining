@@ -66,7 +66,9 @@ def test_ranking_has_no_duplicate_canonical_cv_ids(tmp_path: Path) -> None:
     run_full_pipeline(tmp_path, cfg, ingest=False, semantic=False, evaluate=False, bm25=False)
 
     out = pd.read_csv(tmp_path / "data" / "gold" / "rankings" / "candidate_scores_explained.csv")
+    exact_dup_counts = out.groupby(["job_id", "cv_id"]).size()
+    assert not (exact_dup_counts > 1).any(), "job_id + cv_id pairs must be unique in Gold output."
+
     out["cv_id_canonical"] = out["cv_id"].map(normalize_cv_id)
     dup_counts = out.groupby(["job_id", "cv_id_canonical"]).size()
     assert not (dup_counts > 1).any(), "Canonical CV IDs must be unique per job ranking."
-

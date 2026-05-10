@@ -40,7 +40,10 @@ from src.schemas.documents import validate_ground_truth_df, validate_processed_d
 from src.scoring.fusion import fuse_scores, fuse_weighted_raw
 from src.scoring.score_audit import weighted_fusion_v1_row
 from src.silver.build import read_cv_quality_scores
-from src.utils.candidate_dedup import dedupe_candidates_by_canonical_cv_id
+from src.utils.candidate_dedup import (
+    dedupe_candidates_by_canonical_cv_id,
+    dedupe_candidates_by_job_cv_id,
+)
 from src.utils.experiment import write_run_manifest
 from src.utils.helpers import ensure_parent, resolve_path
 from src.utils.id_normalization import normalize_cv_id, normalize_job_id
@@ -379,6 +382,11 @@ def run_full_pipeline(
         score_column="ranking_score",
         keep_canonical_column=False,
     )
+    # Final guard for Gold outputs: enforce one row per (job_id, cv_id).
+    renamed = dedupe_candidates_by_job_cv_id(
+        renamed,
+        score_column="ranking_score",
+    )
 
     # ------------------------------------------------------------------
     # Learned fusion score (additional model; V1/V2 unchanged)
@@ -406,11 +414,11 @@ def run_full_pipeline(
                 renamed, lf_model, feature_cols=list(DEFAULT_FEATURE_COLS)
             )
             logger.info("Learned fusion model artifacts saved: %s, %s", lf_model_path, lf_weights_path)
-        except ValueError as exc:
+        except (ValueError, ImportError) as exc:
             logger.warning("Learned fusion training skipped: %s", exc)
             renamed["learned_fusion_score"] = np.nan
     else:
-        logger.info("Learned fusion training skipped: ground_truth.csv not found.")
+        logger.warning("Learned fusion training skipped: %s not found.", gt_rel)
         renamed["learned_fusion_score"] = np.nan
 
     # ------------------------------------------------------------------
