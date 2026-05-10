@@ -63,7 +63,7 @@ def main() -> None:
     eval_group.add_argument(
         "--evaluate",
         action="store_true",
-        help="Run offline metrics when paths.ground_truth exists (skipped with log if missing)",
+        help="Run offline metrics if the ground_truth file exists; otherwise log and skip (no error)",
     )
     eval_group.add_argument(
         "--no-evaluate",

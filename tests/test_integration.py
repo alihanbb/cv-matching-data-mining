@@ -286,6 +286,8 @@ class TestFullPipeline:
         assert explained.is_file(), "Explained rankings CSV not written"
         df = pd.read_csv(explained)
         assert not df.empty
+        for col in ("score_check", "score_diff", "score_warning"):
+            assert col in df.columns, f"Missing audit column '{col}' in explained CSV"
 
     def test_no_duplicate_cv_per_job(self, ingested_root: Path) -> None:
         cfg = _make_cfg(ingested_root)

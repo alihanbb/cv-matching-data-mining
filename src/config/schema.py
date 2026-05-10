@@ -69,6 +69,7 @@ class IngestConfig(BaseModel):
     raw_jobs_dir: str = "data/bronze/job_descriptions"
     bronze_resumes_jsonl: str = "data/bronze/resumes/resumes_bronze.jsonl"
     bronze_jobs_jsonl: str = "data/bronze/jobs/jobs_bronze.jsonl"
+    bronze_ner_annotations_jsonl: str = "data/bronze/annotations/ner_annotations_bronze.jsonl"
     ranking_sources: list[str] = Field(default_factory=list)
     ner_corpus_sources: list[str] = Field(default_factory=list)
     cv_corpus_jsonl: IngestCvCorpusJsonlConfig = Field(default_factory=IngestCvCorpusJsonlConfig)

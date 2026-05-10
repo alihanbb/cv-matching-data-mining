@@ -24,6 +24,7 @@ ingest:
   raw_jobs_dir: data/bronze/job_descriptions
   bronze_resumes_jsonl: data/bronze/resumes/resumes_bronze.jsonl
   bronze_jobs_jsonl: data/bronze/jobs/jobs_bronze.jsonl
+  bronze_ner_annotations_jsonl: data/bronze/annotations/ner_annotations_bronze.jsonl
 
   # Non-empty: only these ``source`` tags enter ranking corpus (JSONL + optional corpus JSONL).
   ranking_sources:
@@ -47,6 +48,9 @@ ingest:
     # Single cap on JSONL corpus rows loaded for ranking augmentation (omit or null = unlimited).
     max_rows: 12000
 
+# =============================================================================
+# Silver — profiles and incremental JSONL
+# =============================================================================
 silver:
   unified_resumes: data/silver/unified_resumes.jsonl
   resume_profiles: data/silver/resume_profiles.jsonl

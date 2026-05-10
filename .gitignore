@@ -1,34 +1,53 @@
-# Data & large artifacts (default local paths — do not commit)
+# -----------------------------------------------------------------------------
+# Data layers — keep large corpora and generated tables local only
+# (tracked test fixtures live under tests/fixtures/, not ignored)
+# -----------------------------------------------------------------------------
 data/bronze/
 data/silver/
 data/gold/
 data/external/
 
-# Binary / archive inputs
-*.docx
-*.pdf
-*.zip
+# Wide generated CSV / JSONL under data/ (explicit patterns, not tests/)
+data/silver/**/*.csv
+data/silver/**/*.jsonl
+data/gold/**/*.csv
+data/gold/**/*.pkl
+data/bronze/**/*.jsonl
 
+# Binary or archive inputs often copied into bronze
+data/**/*.docx
+data/**/*.pdf
+data/**/*.zip
+
+# -----------------------------------------------------------------------------
 # Python bytecode
+# -----------------------------------------------------------------------------
 __pycache__/
 *.pyc
 
+# -----------------------------------------------------------------------------
 # Tests / notebooks cache
+# -----------------------------------------------------------------------------
 .pytest_cache/
 .ipynb_checkpoints/
 
+# -----------------------------------------------------------------------------
 # Run manifests
+# -----------------------------------------------------------------------------
 artifacts/runs/
 
+# -----------------------------------------------------------------------------
 # Virtual environments & builds
+# -----------------------------------------------------------------------------
 .ruff_cache/
 .venv/
 venv/
 env/
-
 *.egg-info/
 dist/
 build/
 
+# -----------------------------------------------------------------------------
 # OS / editors
+# -----------------------------------------------------------------------------
 .DS_Store

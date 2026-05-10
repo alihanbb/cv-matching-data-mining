@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_BRONZE_RESUMES_JSONL = Path("data/bronze/resumes/resumes_bronze.jsonl")
 DEFAULT_BRONZE_JOBS_JSONL = Path("data/bronze/jobs/jobs_bronze.jsonl")
+DEFAULT_BRONZE_NER_JSONL = Path("data/bronze/annotations/ner_annotations_bronze.jsonl")
 
 
 def bronze_resumes_path(root: Path, cfg: dict[str, Any] | None = None) -> Path:
@@ -25,6 +26,11 @@ def bronze_resumes_path(root: Path, cfg: dict[str, Any] | None = None) -> Path:
 
 def bronze_jobs_path(root: Path, cfg: dict[str, Any] | None = None) -> Path:
     rel = (cfg or {}).get("bronze_jobs_jsonl") or str(DEFAULT_BRONZE_JOBS_JSONL)
+    return root / rel
+
+
+def bronze_ner_annotations_path(root: Path, cfg: dict[str, Any] | None = None) -> Path:
+    rel = (cfg or {}).get("bronze_ner_annotations_jsonl") or str(DEFAULT_BRONZE_NER_JSONL)
     return root / rel
 
 

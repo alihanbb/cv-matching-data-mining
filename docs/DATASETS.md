@@ -1,44 +1,51 @@
-# Datasets — external import & Bronze JSONL
+# Datasets — external import and Bronze JSONL
 
-Bu belge, projeye **dış veri setlerinin tek seferlik** nasıl dahil edildiğini ve Bronze şemasıyla nasıl hizalandığını özetler.
-
----
-
-## External Dataset Import
-
-- Dış CV/NER/job eşleştirme repoları **proje köküne gömülmez**; aynı üst dizinde veya `--source-root` altında klonlanır.
-- `scripts/import_external_repos_to_bronze.py` yalnızca bu aşamada dış klasör formatlarını bilir; **`main.py` ve eşleştirme kodu yalnızca Bronze JSONL** okur.
+Bu belge, üçüncü taraf veri setlerinin projeye **tek seferlik** nasıl alındığını ve tercih edilen Bronze şemasıyla nasıl hizalandığını özetler.
 
 ---
 
-## Supported Sources
+## Hedef mimari (Bronze)
 
-| Kaynak klasörü | Kısa seçenek (`--source`) | Amaç |
-|----------------|---------------------------|------|
-| `NLP_NER_ON_RESUME` | `nlp_ner` | Yapılandırılmış özgeçmiş JSON referansı |
-| `Entity-Recognition-In-Resumes-SpaCy` | `dataturks` | DataTurks export (train/test NER) |
-| `vacancy-resume-matching-dataset` | `vanetik` | CV–job DOCX + vacancy CSV, eşleştirme GT |
-| `NER-Annotated-CVs` | `mehyar` | Annotated JSON korpusu |
+| Dosya | İçerik |
+|-------|--------|
+| `data/bronze/resumes/resumes_bronze.jsonl` | Özgeçmiş satırları (`resume_id`, `raw_text`, `source`, …) |
+| `data/bronze/jobs/jobs_bronze.jsonl` | İş ilanı satırları |
+| `data/bronze/annotations/ner_annotations_bronze.jsonl` | NER varlık listeleri (profil / zenginleştirme) |
 
-Tam yol `import` script’i içindeki `REPO_ALIASES` ile eşleştirilir; klasör bulunamazsa **warning** yazılır ve o kaynak atlanır.
+**Fallback:** Yukarıdaki JSONL dosyaları yoksa veya boşsa ingest, şu klasörlerdeki ham dosyaları okur:
+
+- `data/bronze/cvs/` — PDF, DOCX, TXT, MD
+- `data/bronze/job_descriptions/` — aynı uzantılar
+
+Eşleştirme kodu **klonlanmış dış repo klasörlerini doğrudan kullanmaz**; dış veri `scripts/import_external_repos_to_bronze.py` ile bu Bronze yapısına taşınır.
 
 ---
 
-## Bronze Outputs
+## Desteklenen dış kaynaklar
 
-| Çıktı dosyası | Açıklama |
-|---------------|-----------|
-| `data/bronze/resumes/resumes_bronze.jsonl` | Normalize CV satırları (`resume_id`, `raw_text`, `source`, …) |
-| `data/bronze/jobs/jobs_bronze.jsonl` | Normalize iş ilanı satırları |
-| `data/bronze/annotations/ner_annotations_bronze.jsonl` | NER varlık dizileri |
+| Kaynak klasörü | `--source` kısa adı | Not |
+|----------------|---------------------|-----|
+| `NLP_NER_ON_RESUME` | `nlp_ner` | Örnek JSON Resume metni |
+| `Entity-Recognition-In-Resumes-SpaCy` | `dataturks` | DataTurks train/test NER |
+| `vacancy-resume-matching-dataset` | `vanetik` | DOCX CV + vacancy CSV, GT şablonu |
+| `NER-Annotated-CVs` | `mehyar` | Annotated JSON (ZIP açılmış olmalı) |
+
+Tam yol `import` script’indeki `REPO_ALIASES` ile eşleşir; klasör yoksa uyarı verilir ve o kaynak atlanır.
+
+---
+
+## Bronze çıktıları
+
+| Çıktı | Açıklama |
+|-------|----------|
 | `*.stats.json` | Satır sayıları / `source` dağılımı |
-| `data/evaluation/ground_truth.csv` | Mümkün olduğunda şablon veya kısmi GT (manuel doğrulama önerilir) |
+| `data/evaluation/ground_truth.csv` | Mümkünse şablon veya kısmi ground truth (manuel doğrulama önerilir) |
 
 ---
 
-## Import Commands
+## Import komutları
 
-Üst dizinde dört repo klonlu iken, proje kökünden (`cv-matching-data-mining`):
+Üst dizinde dört repo varsa, proje kökünden (`cv-matching-data-mining`):
 
 ```bash
 python scripts/import_external_repos_to_bronze.py --source-root .. --all --overwrite
@@ -52,36 +59,34 @@ python scripts/import_external_repos_to_bronze.py --source-root .. --source vane
 
 ---
 
-## Source Usage Strategy
+## Kaynak kullanım stratejisi
 
 | Kaynak | Tipik kullanım |
 |--------|----------------|
-| **Vanetik** | Ranking + değerlendirme (iş–CV eşleşmesi, GT üretimi için taban) |
-| **DataTurks / Mehyar** | Silver profil / NER zenginleştirme; config’teki `ner_corpus_sources` ile hizalanır |
-| **NLP_NER_ON_RESUME** | Metin çıkarım şeması referansı; örnek hacmi küçük olabilir |
+| **Vanetik** | Sıralama + değerlendirme tabanı (iş–CV eşlemesi, GT) |
+| **DataTurks / Mehyar** | Silver profil / NER; `config` içindeki `ner_corpus_sources` ile hizalanır |
+| **NLP_NER_ON_RESUME** | Şema referansı; örnek hacim küçük olabilir |
 
-`config/config.yaml` içinde **`ingest.ranking_sources`** dolu ise, yalnızca listedeki `source` etiketli satırlar ranking tablosuna girer (boş liste = tüm kaynaklar ranking için uygun varsayılır).
-
----
-
-## Limitations
-
-- Klonların iç yapısı zamanla değişebilir; script’ler alan adı değişimlerinde güncellenmelidir.
-- Otomatik `ground_truth.csv` tam ve hatasız olmayabilir; `docs/GROUND_TRUTH_GUIDE.md` ile doğrulama önerilir.
-- DOCX/ZIP çıkarımı kullanıcı ortamına bağlıdır (ör. Mehyar ZIP’inin önce açılması gerekebilir).
+`ingest.ranking_sources` doluysa, yalnızca listedeki `source` etiketli satırlar ranking tablosuna girer (boş liste = tüm kaynaklar kabul).
 
 ---
 
-## License and Ethics Notes
+## Kısıtlar
 
-- Üçüncü taraf içeriklerin **lisans ve kullanım koşullarına uyun**.
-- Kişisel veri içeren korpuslar için KVKK / GDPR uyumlu süreç: `docs/KVKK_VE_GUVENLIK.md`.
+- Klon iç yapısı zamanla değişebilir; alan adları güncellenmelidir.
+- Otomatik `ground_truth.csv` tam doğruluk taahhüdü değildir; bkz. `docs/GROUND_TRUTH_GUIDE.md`.
+- Mehyar için ZIP’in önce açılması gerekebilir.
 
 ---
 
-## After Import
+## Lisans ve etik
 
-Bronze oluşturulduktan sonra standart zincir:
+- Üçüncü taraf içeriklerin lisans ve kullanım koşullarına uyun.
+- Kişisel veri için: `docs/KVKK_VE_GUVENLIK.md`.
+
+---
+
+## Import sonrası standart zincir
 
 ```bash
 python main.py --ingest
@@ -89,10 +94,16 @@ python main.py --semantic --bm25
 python main.py --evaluate
 ```
 
-Opsiyonel: eski tek dosyalı Silver birleştirici (yedek akış):
+`ground_truth.csv` yoksa değerlendirme uyarı ile **atlanır**, pipeline durmaz.
+
+---
+
+## Opsiyonel: eski Silver birleştirici
+
+Eski tek dosyalı birleştirme (yedek akış):
 
 ```bash
 python -m src.ingest.unify_datasets --source-root .. --output data/silver/unified_resumes.jsonl
 ```
 
-**Önerilen** akış: Bronze JSONL → `python main.py --ingest` → Silver tablolar / profiller.
+**Önerilen** üretim akışı: Bronze JSONL → `python main.py --ingest` → Silver tablolar ve profiller.

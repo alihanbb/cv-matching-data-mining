@@ -328,7 +328,7 @@ cv-matching-data-mining/
 │   ├── config.yaml
 │   └── skills.yaml             # Skill alias + kategori lexicon
 ├── data/
-│   ├── bronze/                 # Ham dosyalar
+│   ├── bronze/                 # Tercihen JSONL: resumes/, jobs/, annotations/; yoksa cvs/ + job_descriptions/
 │   ├── silver/                 # Temiz tablolar + canonical JSONL
 │   ├── gold/                   # Model + sıralama çıktıları
 │   └── evaluation/             # ground_truth.csv
