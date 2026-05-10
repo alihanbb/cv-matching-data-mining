@@ -10,7 +10,9 @@ def bm25_matrix(job_queries: list[str], cv_docs: list[str]) -> np.ndarray:
     try:
         from rank_bm25 import BM25Okapi
     except ImportError as e:  # pragma: no cover
-        raise ImportError("rank-bm25 is required for BM25 scoring. Install optional extra 'bm25'.") from e
+        raise ImportError(
+            "rank-bm25 is required for BM25 scoring. Install optional extra 'bm25'."
+        ) from e
 
     tokenized_cvs = [tokenize_unicode(d) for d in cv_docs]
     # BM25Okapi requires non-empty doc token lists; placeholder avoids all-zero columns.

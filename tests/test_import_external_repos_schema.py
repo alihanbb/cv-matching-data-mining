@@ -21,28 +21,57 @@ def _iter_jsonl(path: Path):
                 yield json.loads(line)
 
 
-@pytest.mark.skipif(not (_FIX / "resumes_bronze.jsonl").is_file(), reason="fixture missing")
+@pytest.mark.skipif(
+    not (_FIX / "resumes_bronze.jsonl").is_file(), reason="fixture missing"
+)
 def test_resumes_bronze_schema() -> None:
     for row in _iter_jsonl(_FIX / "resumes_bronze.jsonl"):
-        for key in ("resume_id", "source", "source_file", "raw_text", "language", "labels", "metadata"):
+        for key in (
+            "resume_id",
+            "source",
+            "source_file",
+            "raw_text",
+            "language",
+            "labels",
+            "metadata",
+        ):
             assert key in row
         assert isinstance(row["labels"], dict) and "entities" in row["labels"]
         assert isinstance(row["labels"]["entities"], list)
         assert row["raw_text"].strip()
 
 
-@pytest.mark.skipif(not (_FIX / "jobs_bronze.jsonl").is_file(), reason="fixture missing")
+@pytest.mark.skipif(
+    not (_FIX / "jobs_bronze.jsonl").is_file(), reason="fixture missing"
+)
 def test_jobs_bronze_schema() -> None:
     for row in _iter_jsonl(_FIX / "jobs_bronze.jsonl"):
-        for key in ("job_id", "source", "source_file", "raw_text", "title", "language", "metadata"):
+        for key in (
+            "job_id",
+            "source",
+            "source_file",
+            "raw_text",
+            "title",
+            "language",
+            "metadata",
+        ):
             assert key in row
         assert row["raw_text"].strip()
 
 
-@pytest.mark.skipif(not (_FIX / "ner_annotations_bronze.jsonl").is_file(), reason="fixture missing")
+@pytest.mark.skipif(
+    not (_FIX / "ner_annotations_bronze.jsonl").is_file(), reason="fixture missing"
+)
 def test_ner_annotations_bronze_schema() -> None:
     for row in _iter_jsonl(_FIX / "ner_annotations_bronze.jsonl"):
-        for key in ("annotation_id", "source", "source_file", "text", "entities", "metadata"):
+        for key in (
+            "annotation_id",
+            "source",
+            "source_file",
+            "text",
+            "entities",
+            "metadata",
+        ):
             assert key in row
         for ent in row["entities"]:
             assert "start" in ent and "end" in ent and "label" in ent and "text" in ent

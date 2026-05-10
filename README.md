@@ -43,8 +43,8 @@ Detay: [docs/RAPOR.md](docs/RAPOR.md), diyagram: [docs/PIPELINE_DIAGRAM.md](docs
 | Katman | Dizin | İçerik |
 |---|---|---|
 | **Bronze** (ham) | `data/bronze/resumes/resumes_bronze.jsonl`, `data/bronze/jobs/jobs_bronze.jsonl` _(tercih edilen)_ veya klasör ingest: `data/bronze/cvs/`, `data/bronze/job_descriptions/` | Orijinal içerik; JSONL pipeline için kanonik forma dönüştürülmüş satırlar. |
-| **Silver** (temiz) | `data/silver/cleaned_cvs.csv`, `data/silver/cleaned_jobs.csv`, `data/silver/unified_resumes.jsonl` | Normalize tablo; CV’lerde `cv_id` (Bronze `resume_id`), `raw_text`, `cleaned_text`, skorlama için `text`. |
-| **Gold** (model + sonuç) | `data/gold/models/tfidf_model.pkl`, `data/gold/rankings/candidate_scores.csv`, `data/gold/rankings/candidate_scores_explained.csv` | Eğitilmiş özellikler ve sıralama çıktıları. |
+| **Silver** (temiz) | `data/silver/cleaned_cvs.csv`, `data/silver/cleaned_jobs.csv`, `data/silver/unified_resumes.jsonl`, `data/silver/resume_profiles.jsonl`, `data/silver/job_profiles.jsonl`, `data/silver/silver_stats.json` | Normalize tablo ve profiller; CV’lerde `cv_id` (Bronze `resume_id`), PII maskeli metin, çıkarılmış beceriler/bölümler. |
+| **Gold** (model + sonuç) | `data/gold/models/tfidf_model.pkl`, `data/gold/rankings/candidate_scores.csv`, `data/gold/rankings/candidate_scores_explained.csv`, `data/gold/rankings/top_candidates_by_job.csv`, `data/gold/evaluation/*.csv` | Eğitilmiş özellikler, sıralama ve değerlendirme çıktıları. |
 | **Etiketler** | `data/evaluation/ground_truth.csv` | Dereceli relevans (0–3), offline değerlendirme. |
 | **İz / Manifest** | `artifacts/runs/<UTC>/manifest.json` | Config özeti, artifact yolları, metrikler. |
 
@@ -94,7 +94,7 @@ Kanallar:
 2. **Semantic cosine (SBERT)** — varsayılan `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (encode + L2 normalize; yüklenemezse anlaşılır uyarı).
 3. **Skill score** — ilan içi *must-have / nice-to-have* bölümlerinden türetilen beceri kapsamı:
    `skill_score = 0.75 * must_have_coverage + 0.25 * nice_to_have_coverage` (nice-to-have yoksa `skill_score = must_have_coverage`).
-   Yanında **skill Jaccard** kolonu tutulur (`skill_jaccard`).
+   Yanında **skill Jaccard** kolonu tutulur (`skill_jaccard_score`).
 4. **Experience** — CV ve ilan metninden İngilizce/Türkçe yıl ifadeleri + minimum gereksinim eşlemesi.
 
 ```bash
@@ -145,19 +145,28 @@ Model: `cross-encoder/ms-marco-MiniLM-L-6-v2` — her iş için ilk 20 adayı ye
 
 ## Final score formula and auditing
 
-**Raw (raporlanan `final_score`)** — gösterilen bileşen skorları üzerinden:
+**Raporlanan Hybrid V1 (`final_score_v1` / `final_score`)** — ham (normalize edilmemiş) kanal skorları üzerinden yapılandırılmış ağırlıklar:
 
 ```
-final_score_raw =
+final_score_v1 =
   w_tfidf * tfidf_score + w_sem * semantic_score + w_skill * skill_score + w_exp * experience_score
 ```
 
-Varsayılan V1 ağırlıkları `config/config.yaml` içinde (0.35 / 0.35 / 0.20 / 0.10). Sıralama için kanallar **iş bazında min–max normalize** edilerek füze edilir (`ranking_score`).
+`final_score_v2_bm25`, V2 ağırlıkları ile aynı mantıkta **`bm25_score` dahil** ham toplamdır.
 
-Açıklanabilir CSV ek kolonları:
+Varsayılan V1/V2 ağırlıkları `config/config.yaml` içindedir. **`ranking_score`**, kanalları **iş bazında min–max** normalize ederek üretilen füzyon skorudur (sıralama anahtarı).
 
-- `final_score_raw`, `final_score_normalized`, `score_check`, `score_diff`, `score_warning` (`score_diff > 0.01` ise uyarı)
-- `bm25_score`, `final_score_v2_bm25`, `must_have_coverage`, `nice_to_have_coverage`, ilgili skill listeleri
+**Min–max ile elde edilmiş ayrı gösterge** (normalize edilmiş füzyon, `final_score` kolonunun yerine geçmez):
+
+- `fusion_minmax_normalized_v1` — V1 ağırlıkları + min–max kanal füzyonu (çift başına).
+
+Ek denetim kolonları:
+
+- `score_check` (V1 ağırlıklarıyla satır üzerinden yeniden hesaplanan ham toplam; `final_score_v1` ile eşleşmelidir), `score_diff`, `score_warning`
+
+Açıklanabilir CSV öne çıkan kolonlar:
+
+- `source`, `skill_jaccard_score`, `cv_quality_score`, `final_score_v1`, `final_score_v2_bm25`, `must_have_coverage`, `nice_to_have_coverage`, ilgili skill listeleri
 - `cv_years_experience`, `job_min_years_experience`, `explanation`, `suggested_improvements`
 
 ## Requirement coverage (skill_score)
@@ -196,7 +205,7 @@ python main.py --export-eval-csv
 
 Çıktı: `data/gold/evaluation/evaluation_results.csv`, `data/gold/evaluation/model_comparison.csv`
 
-Karşılaştırılan modeller: TF-IDF baseline, TF-IDF+SBERT, Hybrid V1, Hybrid V2+BM25, Optimized Fusion (best weights dosyası varsa).
+Karşılaştırılan modeller: TF-IDF baseline (**tfidf_score** ağırlıklı ham toplam), **Semantic Only**, Hybrid V1 (**final_score_v1** ile uyumlu ham füzyon), Hybrid V2+BM25 (**final_score_v2_bm25** ile uyumlu), Optimized Fusion (best weights dosyası varsa).
 
 Metrikler: Precision@K, Recall@K, NDCG@K, MRR, MAP.
 

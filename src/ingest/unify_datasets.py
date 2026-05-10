@@ -82,7 +82,18 @@ def iter_ner_json(path: Path, source_name: str) -> Iterable[dict[str, Any]]:
         return
     for idx, item in enumerate(_iter_json_records(path)):
         text = _safe_text(item.get("text"))
-        annotations = item.get("annotations") if isinstance(item.get("annotations"), list) else []
+        raw_ann = item.get("annotations")
+        annotations: list[Any]
+        if (
+            isinstance(raw_ann, list)
+            and raw_ann
+            and isinstance(raw_ann[0], (list, tuple))
+        ):
+            annotations = _mehyar_triples_to_entities(raw_ann)
+        elif isinstance(raw_ann, list):
+            annotations = raw_ann
+        else:
+            annotations = []
         yield _make_record(
             record_id=_stable_id(source_name, str(idx), text[:100]),
             source=source_name,
@@ -96,6 +107,209 @@ def iter_ner_json(path: Path, source_name: str) -> Iterable[dict[str, Any]]:
         )
 
 
+def _dataturks_annotation_to_entities(annotation: Any) -> list[dict[str, Any]]:
+    if not isinstance(annotation, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for ann in annotation:
+        if not isinstance(ann, dict):
+            continue
+        pts = ann.get("points")
+        if not isinstance(pts, list) or not pts:
+            continue
+        p0 = pts[0]
+        if not isinstance(p0, dict):
+            continue
+        start, end = p0.get("start"), p0.get("end")
+        if start is None or end is None:
+            continue
+        labels = ann.get("label")
+        lab_list: list[Any]
+        if isinstance(labels, list):
+            lab_list = labels
+        elif labels is not None:
+            lab_list = [labels]
+        else:
+            continue
+        for lab in lab_list:
+            if lab is None:
+                continue
+            out.append({"start": int(start), "end": int(end) + 1, "label": str(lab)})
+    return out
+
+
+def iter_dataturks_resume_jsonl(
+    path: Path, source_name: str
+) -> Iterable[dict[str, Any]]:
+    """DataTurks export: one JSON object per line with ``content`` and ``annotation``."""
+    if not path.is_file():
+        return
+    with path.open("r", encoding="utf-8", errors="replace") as f:
+        for idx, line in enumerate(f):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                item = json.loads(line)
+            except JSONDecodeError:
+                continue
+            if not isinstance(item, dict):
+                continue
+            text = _safe_text(item.get("content"))
+            entities = _dataturks_annotation_to_entities(item.get("annotation"))
+            yield _make_record(
+                record_id=_stable_id(source_name, str(idx), text[:100]),
+                source=source_name,
+                source_file=path,
+                source_row=idx,
+                text=text,
+                labels={"entities": entities},
+                metadata={"annotation_count": len(entities)},
+                status="ok" if text else "empty_text",
+                error=None if text else "empty_text",
+            )
+
+
+def _mehyar_triples_to_entities(annotations: Any) -> list[dict[str, Any]]:
+    if not isinstance(annotations, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for t in annotations:
+        if isinstance(t, (list, tuple)) and len(t) >= 3:
+            out.append({"start": int(t[0]), "end": int(t[1]), "label": str(t[2])})
+    return out
+
+
+def iter_mehyar_annotated_json_dir(
+    root: Path, source_name: str
+) -> Iterable[dict[str, Any]]:
+    """Mehyarmlaweh/NER-Annotated-CVs: ``text`` + ``annotations`` as [start, end, label] triples."""
+    if not root.is_dir():
+        return
+    for idx, path in enumerate(sorted(root.glob("*.json"))):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+        except (JSONDecodeError, OSError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        text = _safe_text(data.get("text"))
+        entities = _mehyar_triples_to_entities(data.get("annotations"))
+        yield _make_record(
+            record_id=_stable_id(source_name, path.stem, text[:80]),
+            source=source_name,
+            source_file=path,
+            source_row=idx,
+            text=text,
+            labels={"entities": entities},
+            metadata={"annotation_count": len(entities)},
+            status="ok" if text else "empty_text",
+            error=None if text else "empty_text",
+        )
+
+
+def json_resume_schema_to_text(obj: dict[str, Any]) -> str:
+    """Flatten [jsonresume.org](https://jsonresume.org/schema/)-style JSON to plain text."""
+    parts: list[str] = []
+    basics = obj.get("basics") if isinstance(obj.get("basics"), dict) else {}
+    if basics:
+        for key in ("name", "label", "email", "phone", "summary"):
+            v = basics.get(key)
+            if v and str(v).strip():
+                parts.append(str(v).strip())
+        loc = basics.get("location")
+        if isinstance(loc, dict) and loc.get("address"):
+            parts.append(str(loc["address"]).strip())
+    for edu in obj.get("education") or []:
+        if not isinstance(edu, dict):
+            continue
+        chunk = " ".join(
+            _safe_text(edu.get(k))
+            for k in ("studyType", "area", "institution", "score", "unlabeled")
+            if edu.get(k)
+        )
+        if chunk:
+            parts.append(chunk)
+    for work in obj.get("work") or []:
+        if not isinstance(work, dict):
+            continue
+        header = " ".join(
+            _safe_text(work.get(k)) for k in ("position", "name") if work.get(k)
+        )
+        if header:
+            parts.append(header)
+        for hl in work.get("highlights") or []:
+            if hl and str(hl).strip():
+                parts.append(str(hl).strip())
+        u = work.get("unlabeled")
+        if u and str(u).strip():
+            parts.append(str(u).strip())
+    for sk in obj.get("skills") or []:
+        if not isinstance(sk, dict):
+            continue
+        kws = sk.get("keywords")
+        if isinstance(kws, list) and kws:
+            parts.append(", ".join(str(x) for x in kws if x))
+    return "\n\n".join(p for p in parts if p).strip()
+
+
+def iter_json_resume_file(path: Path, source_name: str) -> Iterable[dict[str, Any]]:
+    """Single demo resume in JSON Resume schema (e.g. NLP_NER_ON_RESUME/resume.json)."""
+    if not path.is_file():
+        return
+    try:
+        obj = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+    except (JSONDecodeError, OSError):
+        return
+    if not isinstance(obj, dict) or "basics" not in obj:
+        return
+    text = json_resume_schema_to_text(obj)
+    basics = obj.get("basics") if isinstance(obj.get("basics"), dict) else {}
+    name = _safe_text(basics.get("name"))
+    yield _make_record(
+        record_id=_stable_id(source_name, path.name, text[:100]),
+        source=source_name,
+        source_file=path,
+        source_row=0,
+        text=text,
+        category=_safe_text(basics.get("label")) or None,
+        labels={"schema": "json_resume"},
+        metadata={"name": name},
+        status="ok" if text else "empty_text",
+        error=None if text else "empty_text",
+    )
+
+
+def _mehyar_annotated_root(workspace: Path) -> Path | None:
+    for rel in (
+        Path("NER-Annotated-CVs") / "extracted" / "ResumesJsonAnnotated",
+        Path("NER-Annotated-CVs") / "ResumesJsonAnnotated",
+    ):
+        p = workspace / rel
+        if p.is_dir():
+            return p
+    return None
+
+
+def iter_workspace_cloned_repos(workspace: Path) -> list[Iterable[dict[str, Any]]]:
+    """Sister clones under the same folder as this project (e.g. ``cv_analysis``)."""
+    out: list[Iterable[dict[str, Any]]] = []
+    dt = workspace / "Entity-Recognition-In-Resumes-SpaCy"
+    train_f = dt / "traindata.json"
+    test_f = dt / "testdata.json"
+    if train_f.is_file():
+        out.append(iter_dataturks_resume_jsonl(train_f, "dataturks_resume_ner_train"))
+    if test_f.is_file():
+        out.append(iter_dataturks_resume_jsonl(test_f, "dataturks_resume_ner_test"))
+    ner_root = _mehyar_annotated_root(workspace)
+    if ner_root is not None:
+        out.append(iter_mehyar_annotated_json_dir(ner_root, "mehyar_ner_annotated_cv"))
+    nlp_ner = workspace / "NLP_NER_ON_RESUME" / "resume.json"
+    if nlp_ner.is_file():
+        out.append(iter_json_resume_file(nlp_ner, "nlp_ner_on_resume_json_demo"))
+    return out
+
+
 def iter_structured_resume_csv(path: Path) -> Iterable[dict[str, Any]]:
     if not path.is_file():
         return
@@ -104,9 +318,7 @@ def iter_structured_resume_csv(path: Path) -> Iterable[dict[str, Any]]:
         for idx, row in enumerate(reader):
             text = _safe_text(row.get("Resume_Text"))
             skills = [
-                x.strip()
-                for x in _safe_text(row.get("Skills")).split(",")
-                if x.strip()
+                x.strip() for x in _safe_text(row.get("Skills")).split(",") if x.strip()
             ]
             metadata = {
                 "name": _safe_text(row.get("Name")),
@@ -117,7 +329,9 @@ def iter_structured_resume_csv(path: Path) -> Iterable[dict[str, Any]]:
                 "years_experience": _safe_text(row.get("Years_Experience")),
             }
             yield _make_record(
-                record_id=_stable_id("resume_dataset_2_csv", str(idx), metadata["email"], text[:100]),
+                record_id=_stable_id(
+                    "resume_dataset_2_csv", str(idx), metadata["email"], text[:100]
+                ),
                 source="resume_dataset_2_csv",
                 source_file=path,
                 source_row=idx,
@@ -140,14 +354,19 @@ def iter_resume_corpus_csv(path: Path) -> Iterable[dict[str, Any]]:
             external_id = _safe_text(row.get("ID"))
             category = _safe_text(row.get("Category")) or None
             yield _make_record(
-                record_id=_stable_id("resume_corpus_csv", external_id or str(idx), text[:100]),
+                record_id=_stable_id(
+                    "resume_corpus_csv", external_id or str(idx), text[:100]
+                ),
                 source="resume_corpus_csv",
                 source_file=path,
                 source_row=idx,
                 text=text,
                 category=category,
                 labels={"category": category},
-                metadata={"external_id": external_id, "has_html": bool(_safe_text(row.get("Resume_html")))},
+                metadata={
+                    "external_id": external_id,
+                    "has_html": bool(_safe_text(row.get("Resume_html"))),
+                },
                 status="ok" if text else "empty_text",
                 error=None if text else "empty_text",
             )
@@ -190,16 +409,24 @@ def write_unified_dataset(
     output_path: Path,
     include_pdfs: bool,
     pdf_limit: int,
+    include_workspace_clones: bool = True,
 ) -> dict[str, Any]:
-    sources = [
+    sources: list[Iterable[dict[str, Any]]] = [
         iter_ner_json(source_root / "train.json", "train_json_ner"),
         iter_ner_json(source_root / "sample.json", "sample_json_ner"),
-        iter_ner_json(source_root / "Entity Recognition in Resumes.json", "entity_recognition_json"),
+        iter_ner_json(
+            source_root / "Entity Recognition in Resumes.json",
+            "entity_recognition_json",
+        ),
         iter_structured_resume_csv(source_root / "resume_dataset_2.csv"),
         iter_resume_corpus_csv(source_root / "Resume" / "Resume.csv"),
     ]
     if include_pdfs:
-        sources.append(iter_category_pdfs(source_root / "data" / "data", limit=pdf_limit))
+        sources.append(
+            iter_category_pdfs(source_root / "data" / "data", limit=pdf_limit)
+        )
+    if include_workspace_clones:
+        sources.extend(iter_workspace_cloned_repos(source_root.resolve()))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -208,6 +435,7 @@ def write_unified_dataset(
         "source_root": str(source_root),
         "include_pdfs": include_pdfs,
         "pdf_limit": pdf_limit,
+        "include_workspace_clones": include_workspace_clones,
         "records": 0,
         "empty_or_error_records": 0,
         "by_source": Counter(),
@@ -235,13 +463,17 @@ def write_unified_dataset(
     stats["by_category"] = dict(stats["by_category"])
 
     stats_path = output_path.with_suffix(output_path.suffix + ".stats.json")
-    stats_path.write_text(json.dumps(stats, indent=2, ensure_ascii=False), encoding="utf-8")
+    stats_path.write_text(
+        json.dumps(stats, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
     stats["stats_path"] = str(stats_path)
     return stats
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Unify all resume datasets into one canonical JSONL file.")
+    parser = argparse.ArgumentParser(
+        description="Unify all resume datasets into one canonical JSONL file."
+    )
     parser.add_argument(
         "--source-root",
         type=Path,
@@ -254,8 +486,22 @@ def main() -> None:
         default=Path("data/silver/unified_resumes.jsonl"),
         help="Canonical output JSONL path.",
     )
-    parser.add_argument("--include-pdfs", action="store_true", help="Also extract and include data/data/*.pdf.")
-    parser.add_argument("--pdf-limit", type=int, default=0, help="Limit PDF extraction count (0 = no limit).")
+    parser.add_argument(
+        "--include-pdfs",
+        action="store_true",
+        help="Also extract and include data/data/*.pdf.",
+    )
+    parser.add_argument(
+        "--pdf-limit",
+        type=int,
+        default=0,
+        help="Limit PDF extraction count (0 = no limit).",
+    )
+    parser.add_argument(
+        "--no-workspace-clones",
+        action="store_true",
+        help="Skip GitHub sister folders (Entity-Recognition-*, NER-Annotated-CVs, NLP_NER_ON_RESUME) next to --source-root.",
+    )
     args = parser.parse_args()
 
     stats = write_unified_dataset(
@@ -263,6 +509,7 @@ def main() -> None:
         output_path=args.output,
         include_pdfs=args.include_pdfs,
         pdf_limit=args.pdf_limit,
+        include_workspace_clones=not args.no_workspace_clones,
     )
     print(
         "Unified dataset written: "

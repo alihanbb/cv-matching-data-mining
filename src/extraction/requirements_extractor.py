@@ -9,7 +9,6 @@ from src.config.defaults import SKILL_SCORE_MUST_WEIGHT, SKILL_SCORE_NICE_WEIGHT
 from src.extraction.skill_extractor import extract_skill_ids
 from src.extraction.skills_lexicon import SkillsLexicon
 
-
 _MUST_HINTS_EN = (
     r"\bmust[- ]have\b",
     r"\brequired\b",
@@ -71,7 +70,9 @@ def _split_sections(text: str) -> tuple[str, str, str]:
     head_end = min(must_idx + nice_idx) if (must_idx or nice_idx) else 0
     head = "\n".join(lines[:head_end])
     if not must_block:
-        must_block = "\n".join(lines) if not head else head + "\n" + "\n".join(lines[head_end:])
+        must_block = (
+            "\n".join(lines) if not head else head + "\n" + "\n".join(lines[head_end:])
+        )
         if not must_block.strip():
             must_block = text
     return head, must_block, nice_block
@@ -94,7 +95,9 @@ def extract_job_requirements(text: str, lex: SkillsLexicon) -> JobRequirements:
     return JobRequirements(must_have=must_ids, nice_to_have=nice_ids)
 
 
-def coverage_sets(cv_skills: set[str], required: set[str]) -> tuple[float, set[str], set[str]]:
+def coverage_sets(
+    cv_skills: set[str], required: set[str]
+) -> tuple[float, set[str], set[str]]:
     if not required:
         return 1.0, set(), set()
     matched = cv_skills & required
@@ -102,10 +105,14 @@ def coverage_sets(cv_skills: set[str], required: set[str]) -> tuple[float, set[s
     return cov, matched, required - matched
 
 
-def skill_score_from_coverage(must_cov: float, nice_cov: float, has_nice: bool) -> float:
+def skill_score_from_coverage(
+    must_cov: float, nice_cov: float, has_nice: bool
+) -> float:
     if not has_nice:
         return float(must_cov)
-    return SKILL_SCORE_MUST_WEIGHT * float(must_cov) + SKILL_SCORE_NICE_WEIGHT * float(nice_cov)
+    return SKILL_SCORE_MUST_WEIGHT * float(must_cov) + SKILL_SCORE_NICE_WEIGHT * float(
+        nice_cov
+    )
 
 
 def requirement_coverage_matrix(
@@ -128,11 +135,15 @@ def requirement_coverage_matrix(
                 nice_cov = 1.0
             must_cov_m[i, j] = must_cov
             nice_cov_m[i, j] = nice_cov if has_nice else 0.0
-            skill_score_m[i, j] = skill_score_from_coverage(must_cov, nice_cov, has_nice)
+            skill_score_m[i, j] = skill_score_from_coverage(
+                must_cov, nice_cov, has_nice
+            )
     return must_cov_m, nice_cov_m, skill_score_m
 
 
-def pair_requirement_summary(cv_skills: set[str], req: JobRequirements) -> dict[str, object]:
+def pair_requirement_summary(
+    cv_skills: set[str], req: JobRequirements
+) -> dict[str, object]:
     must_cov, m_match, m_miss = coverage_sets(cv_skills, req.must_have)
     has_nice = bool(req.nice_to_have)
     if has_nice:

@@ -56,9 +56,13 @@ def validate_ground_truth_df(df: pd.DataFrame) -> pd.DataFrame:
         df = df.rename(columns={"relevance": "relevant"})
     for c in ("cv_id", "job_id", "relevant"):
         if c not in df.columns:
-            raise ValueError(f"Ground truth must have column {c} (or resume_id alias for cv_id)")
+            raise ValueError(
+                f"Ground truth must have column {c} (or resume_id alias for cv_id)"
+            )
     rows: list[dict] = []
     for _, r in df.iterrows():
-        gr = GroundTruthRow(cv_id=str(r["cv_id"]), job_id=str(r["job_id"]), relevant=int(r["relevant"]))
+        gr = GroundTruthRow(
+            cv_id=str(r["cv_id"]), job_id=str(r["job_id"]), relevant=int(r["relevant"])
+        )
         rows.append(gr.model_dump())
     return pd.DataFrame(rows)

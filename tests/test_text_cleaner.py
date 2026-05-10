@@ -14,4 +14,7 @@ def test_clean_handles_non_string_input() -> None:
 
 def test_clean_collapses_whitespace() -> None:
     cleaner = TextCleaner(remove_stopwords=False, lemmatize=False)
-    assert cleaner.clean("  multi   spaces\tand\nnewlines  ") == "multi spaces and newlines"
+    assert (
+        cleaner.clean("  multi   spaces\tand\nnewlines  ")
+        == "multi spaces and newlines"
+    )

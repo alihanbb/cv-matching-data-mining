@@ -8,7 +8,9 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-def try_load_semantic_encoder(model_name: str, *, device: str | None = None) -> Any | None:
+def try_load_semantic_encoder(
+    model_name: str, *, device: str | None = None
+) -> Any | None:
     try:
         from sentence_transformers import SentenceTransformer
     except ImportError:
@@ -19,9 +21,13 @@ def try_load_semantic_encoder(model_name: str, *, device: str | None = None) -> 
         kwargs["device"] = device
     try:
         model = SentenceTransformer(model_name, **kwargs)
-        probe = model.encode(["semantic probe"], normalize_embeddings=True, show_progress_bar=False)
+        probe = model.encode(
+            ["semantic probe"], normalize_embeddings=True, show_progress_bar=False
+        )
         if probe is None or not np.isfinite(probe).all():
-            logger.warning("Embedding model produced non-finite probe output for %s", model_name)
+            logger.warning(
+                "Embedding model produced non-finite probe output for %s", model_name
+            )
             return None
         return model
     except Exception as e:  # pragma: no cover - environment specific

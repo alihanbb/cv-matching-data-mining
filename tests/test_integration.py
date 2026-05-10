@@ -80,6 +80,7 @@ Requirements:
 # Minimal config dict (no SBERT, no BM25 — pure TF-IDF run)
 # ---------------------------------------------------------------------------
 
+
 def _make_cfg(root: Path) -> dict:
     silver = root / "data" / "silver"
     gold = root / "data" / "gold"
@@ -89,16 +90,40 @@ def _make_cfg(root: Path) -> dict:
             "processed_jobs": str(silver / "cleaned_jobs.csv"),
             "tfidf_model": str(gold / "models" / "tfidf_model.pkl"),
             "output_rankings": str(gold / "rankings" / "candidate_scores.csv"),
-            "output_explanations": str(gold / "rankings" / "candidate_scores_explained.csv"),
+            "output_explanations": str(
+                gold / "rankings" / "candidate_scores_explained.csv"
+            ),
         },
-        "skills": {"path": str(Path(__file__).resolve().parents[1] / "config" / "skills.yaml")},
+        "skills": {
+            "path": str(Path(__file__).resolve().parents[1] / "config" / "skills.yaml")
+        },
         "privacy": {"anonymize": True},
-        "preprocessing": {"language": "en", "remove_stopwords": True, "lemmatize": True},
-        "tfidf": {"max_features": 500, "ngram_range": [1, 2], "min_df": 1, "max_df": 0.99, "sublinear_tf": True},
+        "preprocessing": {
+            "language": "en",
+            "remove_stopwords": True,
+            "lemmatize": True,
+        },
+        "tfidf": {
+            "max_features": 500,
+            "ngram_range": [1, 2],
+            "min_df": 1,
+            "max_df": 0.99,
+            "sublinear_tf": True,
+        },
         "embeddings": {"enabled": False},
         "bm25": {"enabled": False},
-        "fusion": {"weights": {"tfidf": 0.5, "dense": 0.0, "skills": 0.3, "experience": 0.2}},
-        "fusion_v2": {"weights": {"tfidf": 0.4, "dense": 0.0, "bm25": 0.2, "skills": 0.2, "experience": 0.2}},
+        "fusion": {
+            "weights": {"tfidf": 0.5, "dense": 0.0, "skills": 0.3, "experience": 0.2}
+        },
+        "fusion_v2": {
+            "weights": {
+                "tfidf": 0.4,
+                "dense": 0.0,
+                "bm25": 0.2,
+                "skills": 0.2,
+                "experience": 0.2,
+            }
+        },
         "matching": {"top_k": 3},
         "evaluation": {"top_k_values": [1, 3]},
         "pipeline": {"write_explanations": True},
@@ -116,6 +141,7 @@ def _make_cfg(root: Path) -> dict:
 # ---------------------------------------------------------------------------
 # Fixture: temporary project root with toy bronze files
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def project_root(tmp_path: Path) -> Path:
@@ -137,6 +163,7 @@ def project_root(tmp_path: Path) -> Path:
 # Tests
 # ---------------------------------------------------------------------------
 
+
 class TestIngestStep:
     """Unit-level: test that ingest produces valid Silver CSVs."""
 
@@ -156,8 +183,12 @@ class TestIngestStep:
 
         assert cv_out.is_file(), "cleaned_cvs.csv not created"
         assert job_out.is_file(), "cleaned_jobs.csv not created"
-        assert n_bronze == len(_CV_TEXTS), f"Expected {len(_CV_TEXTS)} CV rows, got {n_bronze}"
-        assert n_jobs == len(_JOB_TEXTS), f"Expected {len(_JOB_TEXTS)} job rows, got {n_jobs}"
+        assert n_bronze == len(
+            _CV_TEXTS
+        ), f"Expected {len(_CV_TEXTS)} CV rows, got {n_bronze}"
+        assert n_jobs == len(
+            _JOB_TEXTS
+        ), f"Expected {len(_JOB_TEXTS)} job rows, got {n_jobs}"
 
     def test_silver_csv_has_required_columns(self, project_root: Path) -> None:
         cfg = _make_cfg(project_root)
@@ -222,12 +253,16 @@ class TestFullPipeline:
         cfg = _make_cfg(ingested_root)
         run_full_pipeline(ingested_root, cfg, semantic=False, bm25=False)
         df = pd.read_csv(cfg["paths"]["output_rankings"])
-        score_cols = [c for c in df.columns if "score" in c.lower() and df[c].dtype in (float, np.float64)]
+        score_cols = [
+            c
+            for c in df.columns
+            if "score" in c.lower() and df[c].dtype in (float, np.float64)
+        ]
         for col in score_cols:
             vals = df[col].dropna()
-            assert (vals >= -1e-9).all() and (vals <= 1.0 + 1e-9).all(), (
-                f"Column '{col}' has values outside [0, 1]: min={vals.min():.4f} max={vals.max():.4f}"
-            )
+            assert (vals >= -1e-9).all() and (
+                vals <= 1.0 + 1e-9
+            ).all(), f"Column '{col}' has values outside [0, 1]: min={vals.min():.4f} max={vals.max():.4f}"
 
     def test_at_least_one_ranking_per_job(self, ingested_root: Path) -> None:
         cfg = _make_cfg(ingested_root)
@@ -243,9 +278,9 @@ class TestFullPipeline:
         run_full_pipeline(ingested_root, cfg, semantic=False, bm25=False)
         df = pd.read_csv(cfg["paths"]["output_rankings"])
         for job_id, grp in df.groupby("job_id"):
-            assert len(grp) <= top_k, (
-                f"job_id={job_id} has {len(grp)} rows, exceeds top_k={top_k}"
-            )
+            assert (
+                len(grp) <= top_k
+            ), f"job_id={job_id} has {len(grp)} rows, exceeds top_k={top_k}"
 
     def test_ranks_are_contiguous_from_one(self, ingested_root: Path) -> None:
         cfg = _make_cfg(ingested_root)
@@ -253,10 +288,12 @@ class TestFullPipeline:
         df = pd.read_csv(cfg["paths"]["output_rankings"])
         for job_id, grp in df.groupby("job_id"):
             ranks = sorted(grp["rank_for_job"].tolist())
-            assert ranks[0] == 1, f"job_id={job_id}: first rank is {ranks[0]}, expected 1"
-            assert ranks == list(range(1, len(ranks) + 1)), (
-                f"job_id={job_id}: ranks not contiguous: {ranks}"
-            )
+            assert (
+                ranks[0] == 1
+            ), f"job_id={job_id}: first rank is {ranks[0]}, expected 1"
+            assert ranks == list(
+                range(1, len(ranks) + 1)
+            ), f"job_id={job_id}: ranks not contiguous: {ranks}"
 
     def test_explained_csv_written(self, ingested_root: Path) -> None:
         cfg = _make_cfg(ingested_root)
@@ -271,13 +308,17 @@ class TestFullPipeline:
         run_full_pipeline(ingested_root, cfg, semantic=False, bm25=False)
         df = pd.read_csv(cfg["paths"]["output_rankings"])
         for job_id, grp in df.groupby("job_id"):
-            assert grp["cv_id"].nunique() == len(grp), (
-                f"job_id={job_id}: duplicate CV IDs in rankings"
-            )
+            assert grp["cv_id"].nunique() == len(
+                grp
+            ), f"job_id={job_id}: duplicate CV IDs in rankings"
 
-    def test_pipeline_returns_empty_metrics_without_ground_truth(self, ingested_root: Path) -> None:
+    def test_pipeline_returns_empty_metrics_without_ground_truth(
+        self, ingested_root: Path
+    ) -> None:
         cfg = _make_cfg(ingested_root)
-        metrics = run_full_pipeline(ingested_root, cfg, semantic=False, bm25=False, evaluate=False)
+        metrics = run_full_pipeline(
+            ingested_root, cfg, semantic=False, bm25=False, evaluate=False
+        )
         assert isinstance(metrics, dict)
 
 
@@ -296,6 +337,7 @@ class TestConfigSchema:
 
     def test_valid_minimal_config(self) -> None:
         from src.config.schema import PipelineConfig
+
         cfg = PipelineConfig.model_validate(self._base_cfg())
         assert cfg.matching.top_k == 10
         assert cfg.privacy.anonymize is True
@@ -303,6 +345,7 @@ class TestConfigSchema:
     def test_invalid_top_k_raises(self) -> None:
         from pydantic import ValidationError
         from src.config.schema import PipelineConfig
+
         bad = {**self._base_cfg(), "matching": {"top_k": 0}}
         with pytest.raises(ValidationError, match="top_k"):
             PipelineConfig.model_validate(bad)
@@ -310,6 +353,7 @@ class TestConfigSchema:
     def test_invalid_logging_level_raises(self) -> None:
         from pydantic import ValidationError
         from src.config.schema import PipelineConfig
+
         bad = {**self._base_cfg(), "logging": {"level": "VERBOSE"}}
         with pytest.raises(ValidationError):
             PipelineConfig.model_validate(bad)
@@ -317,6 +361,7 @@ class TestConfigSchema:
     def test_invalid_ngram_range_raises(self) -> None:
         from pydantic import ValidationError
         from src.config.schema import PipelineConfig
+
         bad = {**self._base_cfg(), "tfidf": {"ngram_range": [2, 1]}}
         with pytest.raises(ValidationError, match="ngram_range"):
             PipelineConfig.model_validate(bad)
@@ -324,6 +369,7 @@ class TestConfigSchema:
     def test_unknown_key_raises(self) -> None:
         from pydantic import ValidationError
         from src.config.schema import PipelineConfig
+
         bad = {**self._base_cfg(), "nonexistent_section": {"foo": "bar"}}
         with pytest.raises(ValidationError):
             PipelineConfig.model_validate(bad)
@@ -331,5 +377,6 @@ class TestConfigSchema:
     def test_missing_paths_raises(self) -> None:
         from pydantic import ValidationError
         from src.config.schema import PipelineConfig
+
         with pytest.raises(ValidationError, match="paths"):
             PipelineConfig.model_validate({})

@@ -27,7 +27,9 @@ def extract_skill_ids(text: str, lex: SkillsLexicon) -> list[str]:
     return out
 
 
-def extract_skills(text: str, skill_lexicon: SkillsLexicon | None = None, *, root: Path | None = None) -> list[str]:
+def extract_skills(
+    text: str, skill_lexicon: SkillsLexicon | None = None, *, root: Path | None = None
+) -> list[str]:
     """Return display names for backward compatibility."""
     if skill_lexicon is None:
         if root is None:
@@ -49,5 +51,7 @@ def skill_ids_to_display(ids: Iterable[str], lex: SkillsLexicon) -> list[str]:
     return out
 
 
-def extract_skill_ids_sets_for_corpus(texts: list[str], lex: SkillsLexicon) -> list[set[str]]:
+def extract_skill_ids_sets_for_corpus(
+    texts: list[str], lex: SkillsLexicon
+) -> list[set[str]]:
     return [set(extract_skill_ids(t, lex)) for t in texts]

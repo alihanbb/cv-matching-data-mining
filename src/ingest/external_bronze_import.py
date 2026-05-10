@@ -48,7 +48,9 @@ def _safe_str(v: Any) -> str:
     return "" if v is None else str(v).strip()
 
 
-def stats_for_records(records: Iterable[dict[str, Any]], source_key: str = "source") -> dict[str, Any]:
+def stats_for_records(
+    records: Iterable[dict[str, Any]], source_key: str = "source"
+) -> dict[str, Any]:
     by_source: Counter[str] = Counter()
     for rec in records:
         by_source[_safe_str(rec.get(source_key))] += 1
@@ -57,7 +59,9 @@ def stats_for_records(records: Iterable[dict[str, Any]], source_key: str = "sour
 
 def write_stats(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
 
 
 def load_jsonl_by_id(path: Path, id_key: str) -> dict[str, dict[str, Any]]:
@@ -81,7 +85,9 @@ def load_jsonl_by_id(path: Path, id_key: str) -> dict[str, dict[str, Any]]:
     return out
 
 
-def filter_out_sources(rows: dict[str, dict[str, Any]], tags: Iterable[str]) -> dict[str, dict[str, Any]]:
+def filter_out_sources(
+    rows: dict[str, dict[str, Any]], tags: Iterable[str]
+) -> dict[str, dict[str, Any]]:
     tag_set = {t.strip() for t in tags if t}
     return {k: v for k, v in rows.items() if _safe_str(v.get("source")) not in tag_set}
 
@@ -118,21 +124,27 @@ def _extract_bracket_value(text: str, var: str) -> str | None:
     return None
 
 
-def parse_vanetik_annotation_rankings(txt_path: Path) -> tuple[list[list[int]], list[list[int]]] | None:
+def parse_vanetik_annotation_rankings(
+    txt_path: Path,
+) -> tuple[list[list[int]], list[list[int]]] | None:
     if not txt_path.is_file():
         return None
     raw = txt_path.read_text(encoding="utf-8", errors="replace")
-    s1, s2 = _extract_bracket_value(raw, "ANNOTATOR_1_RANKINGS"), _extract_bracket_value(
-        raw, "ANNOTATOR_2_RANKINGS"
-    )
+    s1, s2 = _extract_bracket_value(
+        raw, "ANNOTATOR_1_RANKINGS"
+    ), _extract_bracket_value(raw, "ANNOTATOR_2_RANKINGS")
     if not s1 or not s2:
-        logger.warning("Could not locate ANNOTATOR_*_RANKINGS lists in %s", txt_path.name)
+        logger.warning(
+            "Could not locate ANNOTATOR_*_RANKINGS lists in %s", txt_path.name
+        )
         return None
     try:
         r1 = ast.literal_eval(s1)
         r2 = ast.literal_eval(s2)
     except (SyntaxError, ValueError) as exc:
-        logger.warning("ast.literal_eval failed for rankings (%s): %s", txt_path.name, exc)
+        logger.warning(
+            "ast.literal_eval failed for rankings (%s): %s", txt_path.name, exc
+        )
         return None
     if not (
         isinstance(r1, list)
@@ -184,7 +196,9 @@ def _docx_to_text(path: Path) -> str:
     from docx import Document
 
     doc = Document(str(path))
-    return "\n\n".join(p.text for p in doc.paragraphs if p.text and p.text.strip()).strip()
+    return "\n\n".join(
+        p.text for p in doc.paragraphs if p.text and p.text.strip()
+    ).strip()
 
 
 def _vanetik_resume_id_from_name(name: str) -> str | None:
@@ -204,7 +218,9 @@ def _vacancy_title_and_text(row: dict[str, str]) -> tuple[str, str]:
                 break
     body = ""
     for key, val in lower.items():
-        if any(x in key for x in ("description", "vacancy", "job_text", "text")) and len(val) > len(body):
+        if any(
+            x in key for x in ("description", "vacancy", "job_text", "text")
+        ) and len(val) > len(body):
             body = _safe_str(val)
     if not body:
         for key, val in lower.items():
@@ -270,7 +286,10 @@ def import_vanetik(repo: Path) -> tuple[list[dict], list[dict], list[dict]]:
                         "raw_text": raw_text,
                         "title": title or jid,
                         "language": "en",
-                        "metadata": {"original_format": "csv", "uid": _safe_str(row.get("uid"))},
+                        "metadata": {
+                            "original_format": "csv",
+                            "uid": _safe_str(row.get("uid")),
+                        },
                     }
                 )
 
@@ -294,7 +313,9 @@ def import_vanetik(repo: Path) -> tuple[list[dict], list[dict], list[dict]]:
     return resumes, jobs, gt_template
 
 
-def _dataturks_points_to_entities(content: str, annotation: Any) -> list[dict[str, Any]]:
+def _dataturks_points_to_entities(
+    content: str, annotation: Any
+) -> list[dict[str, Any]]:
     if not isinstance(annotation, list):
         return []
     out: list[dict[str, Any]] = []
@@ -337,7 +358,9 @@ def _ensure_entity_span(text: str, start: int, end: int) -> str:
     return text[start:end]
 
 
-def dataturks_iter(path: Path, source: str, split_tag: str) -> tuple[list[dict], list[dict]]:
+def dataturks_iter(
+    path: Path, source: str, split_tag: str
+) -> tuple[list[dict], list[dict]]:
     resumes: list[dict[str, Any]] = []
     anns: list[dict[str, Any]] = []
     if not path.is_file():
@@ -377,7 +400,11 @@ def dataturks_iter(path: Path, source: str, split_tag: str) -> tuple[list[dict],
                     "raw_text": content,
                     "language": "en",
                     "labels": {"entities": norm_ents},
-                    "metadata": {"original_format": "json", "split": prefix, "category": None},
+                    "metadata": {
+                        "original_format": "json",
+                        "split": prefix,
+                        "category": None,
+                    },
                 }
             )
             anns.append(
@@ -512,7 +539,11 @@ def json_resume_extended_text(obj: dict[str, Any]) -> tuple[str, dict[str, Any]]
         for edu in seq:
             if not isinstance(edu, dict):
                 continue
-            chunk = " ".join(_safe_str(edu.get(k)) for k in ("studyType", "area", "institution", "score") if edu.get(k))
+            chunk = " ".join(
+                _safe_str(edu.get(k))
+                for k in ("studyType", "area", "institution", "score")
+                if edu.get(k)
+            )
             if chunk:
                 parts.append(chunk)
 
@@ -521,7 +552,9 @@ def json_resume_extended_text(obj: dict[str, Any]) -> tuple[str, dict[str, Any]]
     for work in seq:
         if not isinstance(work, dict):
             continue
-        header = " ".join(_safe_str(work.get(k)) for k in ("position", "name") if work.get(k))
+        header = " ".join(
+            _safe_str(work.get(k)) for k in ("position", "name") if work.get(k)
+        )
         if header:
             parts.append(header)
         for hl in work.get("highlights") or []:
@@ -653,7 +686,11 @@ def run_import(
 
     key_list = sorted(set(keys))
 
-    resumes = load_jsonl_by_id(outs.resumes_path, "resume_id") if outs.resumes_path.is_file() else {}
+    resumes = (
+        load_jsonl_by_id(outs.resumes_path, "resume_id")
+        if outs.resumes_path.is_file()
+        else {}
+    )
     jobs = load_jsonl_by_id(outs.jobs_path, "job_id")
     anns = load_jsonl_by_id(outs.ner_path, "annotation_id")
 
@@ -666,10 +703,20 @@ def run_import(
         else:
             strip_tags = {t for k in key_list for t in SOURCE_TAGS.get(k, ())}
             resumes = {
-                rk: rv for rk, rv in resumes.items() if _safe_str(rv.get("source")) not in strip_tags
+                rk: rv
+                for rk, rv in resumes.items()
+                if _safe_str(rv.get("source")) not in strip_tags
             }
-            jobs = {jk: jv for jk, jv in jobs.items() if _safe_str(jv.get("source")) not in strip_tags}
-            anns = {ak: av for ak, av in anns.items() if _safe_str(av.get("source")) not in strip_tags}
+            jobs = {
+                jk: jv
+                for jk, jv in jobs.items()
+                if _safe_str(jv.get("source")) not in strip_tags
+            }
+            anns = {
+                ak: av
+                for ak, av in anns.items()
+                if _safe_str(av.get("source")) not in strip_tags
+            }
 
     gt_rows_written: list[dict[str, Any]] = []
     had_auto_gt = False
@@ -677,7 +724,11 @@ def run_import(
     for key in sorted(key_list):
         repo = resolve_repo(source_root, key)
         if repo is None:
-            logger.warning("Skipping %s — sibling repo folder not found under %s.", key, source_root)
+            logger.warning(
+                "Skipping %s — sibling repo folder not found under %s.",
+                key,
+                source_root,
+            )
             continue
 
         if key == "vanetik":
@@ -695,8 +746,12 @@ def run_import(
                     write_gt_template_csv(outs.gt_tpl, gt_maybe)
 
         elif key == "dataturks":
-            tr_r, tr_a = dataturks_iter(repo / "traindata.json", "dataturks_resume_ner_train", "train")
-            te_r, te_a = dataturks_iter(repo / "testdata.json", "dataturks_resume_ner_test", "test")
+            tr_r, tr_a = dataturks_iter(
+                repo / "traindata.json", "dataturks_resume_ner_train", "train"
+            )
+            te_r, te_a = dataturks_iter(
+                repo / "testdata.json", "dataturks_resume_ner_test", "test"
+            )
             for r in tr_r + te_r:
                 resumes[r["resume_id"]] = r
             for a in tr_a + te_a:
@@ -713,7 +768,9 @@ def run_import(
             for r in import_nlp_resume_json(repo / "resume.json"):
                 resumes[r["resume_id"]] = r
 
-    write_jsonl(outs.resumes_path, sorted(resumes.values(), key=lambda x: x["resume_id"]))
+    write_jsonl(
+        outs.resumes_path, sorted(resumes.values(), key=lambda x: x["resume_id"])
+    )
     write_jsonl(outs.jobs_path, sorted(jobs.values(), key=lambda x: x["job_id"]))
     write_jsonl(outs.ner_path, sorted(anns.values(), key=lambda x: x["annotation_id"]))
 
@@ -723,7 +780,9 @@ def run_import(
 
     if gt_rows_written and had_auto_gt:
         with outs.gt_csv.open("w", encoding="utf-8", newline="\n") as f:
-            w = csv.DictWriter(f, fieldnames=["job_id", "resume_id", "relevance", "source"])
+            w = csv.DictWriter(
+                f, fieldnames=["job_id", "resume_id", "relevance", "source"]
+            )
             w.writeheader()
             for row in gt_rows_written:
                 w.writerow(row)
@@ -745,8 +804,12 @@ def write_gt_template_csv(path: Path, rows: list[dict[str, Any]]) -> None:
             w.writerow(row)
 
 
-def run_cli(argv: list[str] | None = None, *, default_project_root: Path | None = None) -> None:
-    ap = argparse.ArgumentParser(description="Import sister-cloned CV/NER repos into Bronze JSONL.")
+def run_cli(
+    argv: list[str] | None = None, *, default_project_root: Path | None = None
+) -> None:
+    ap = argparse.ArgumentParser(
+        description="Import sister-cloned CV/NER repos into Bronze JSONL."
+    )
     ap.add_argument(
         "--source-root",
         type=Path,
@@ -767,10 +830,16 @@ def run_cli(argv: list[str] | None = None, *, default_project_root: Path | None 
         default=[],
         help="Import a single source (repeatable).",
     )
-    ap.add_argument("--overwrite", action="store_true", help="Replace existing Bronze rows for selected scope.")
+    ap.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Replace existing Bronze rows for selected scope.",
+    )
     args = ap.parse_args(argv)
 
-    project_root = args.project_root or default_project_root or Path(__file__).resolve().parents[3]
+    project_root = (
+        args.project_root or default_project_root or Path(__file__).resolve().parents[3]
+    )
     project_root = project_root.resolve()
     source_root = args.source_root.expanduser().resolve()
 
@@ -779,11 +848,19 @@ def run_cli(argv: list[str] | None = None, *, default_project_root: Path | None 
     elif args.source:
         keys = list(args.source)
     else:
-        print("Specify --all or at least one --source {vanetik,dataturks,mehyar,nlp_ner}", file=sys.stderr)
+        print(
+            "Specify --all or at least one --source {vanetik,dataturks,mehyar,nlp_ner}",
+            file=sys.stderr,
+        )
         sys.exit(2)
 
     try:
-        summary = run_import(source_root=source_root, project_root=project_root, keys=keys, overwrite=args.overwrite)
+        summary = run_import(
+            source_root=source_root,
+            project_root=project_root,
+            keys=keys,
+            overwrite=args.overwrite,
+        )
     except Exception as exc:
         logger.exception("Import failed: %s", exc)
         sys.exit(1)

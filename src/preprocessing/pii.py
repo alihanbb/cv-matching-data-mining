@@ -34,7 +34,9 @@ def anonymize_text(text: str, *, mask: str = "[REDACTED]") -> str:
     return t
 
 
-def anonymize_text_audited(text: str, *, mask: str = "[REDACTED]", doc_id: str = "") -> str:
+def anonymize_text_audited(
+    text: str, *, mask: str = "[REDACTED]", doc_id: str = ""
+) -> str:
     """Anonymize text and log how many PII patterns were masked.
 
     Use this variant when an audit trail is required (e.g. pipeline runs

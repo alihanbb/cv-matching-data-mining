@@ -35,7 +35,11 @@ def write_run_manifest(
     run_dir = runs / stamp
     run_dir.mkdir(parents=True, exist_ok=True)
     cfg_hash = hashlib.sha256(_canonical_cfg(cfg)).hexdigest()
-    data_hashes = {k: _sha256_file(Path(v)) for k, v in artifact_paths.items() if k.startswith("input_")}
+    data_hashes = {
+        k: _sha256_file(Path(v))
+        for k, v in artifact_paths.items()
+        if k.startswith("input_")
+    }
     manifest = {
         "run_id": stamp,
         "config_sha256": cfg_hash,

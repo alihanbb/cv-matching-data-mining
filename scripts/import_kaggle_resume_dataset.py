@@ -19,11 +19,15 @@ def main() -> None:
     try:
         from kaggle.api.kaggle_api_extended import KaggleApi
     except ImportError as e:
-        raise SystemExit("pip install -e \".[kaggle_import]\" and configure ~/.kaggle/kaggle.json") from e
+        raise SystemExit(
+            'pip install -e ".[kaggle_import]" and configure ~/.kaggle/kaggle.json'
+        ) from e
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
-    ap.add_argument("--dataset", type=str, required=True, help="Kaggle dataset slug owner/name")
+    ap.add_argument(
+        "--dataset", type=str, required=True, help="Kaggle dataset slug owner/name"
+    )
     args = ap.parse_args()
     root: Path = args.root
     dl_dir = root / "data" / "bronze" / "_kaggle_download"
@@ -43,7 +47,9 @@ def main() -> None:
             target = out_cv / p.name
             target.write_bytes(p.read_bytes())
             moved += 1
-    print(f"Copied {moved} files into {out_cv}. Review and de-duplicate filenames if needed.")
+    print(
+        f"Copied {moved} files into {out_cv}. Review and de-duplicate filenames if needed."
+    )
 
 
 if __name__ == "__main__":

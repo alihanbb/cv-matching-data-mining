@@ -16,10 +16,10 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-
 # ---------------------------------------------------------------------------
 # Sub-models
 # ---------------------------------------------------------------------------
+
 
 class PathsConfig(BaseModel):
     model_config = {"extra": "forbid"}
@@ -29,6 +29,10 @@ class PathsConfig(BaseModel):
     tfidf_model: str
     output_rankings: str
     output_explanations: str = "data/gold/rankings/candidate_scores_explained.csv"
+    top_candidates_csv: str = "data/gold/rankings/top_candidates_by_job.csv"
+    evaluation_results_csv: str = "data/gold/evaluation/evaluation_results.csv"
+    model_comparison_csv: str = "data/gold/evaluation/model_comparison.csv"
+    score_audit_report_csv: str = "data/gold/evaluation/score_audit_report.csv"
     ground_truth: str | None = None
 
 
@@ -46,7 +50,16 @@ class IngestCvCorpusJsonlConfig(BaseModel):
     id_field: str = "record_id"
     text_field: str = "text"
     id_prefix: str = "corpus_"
-    max_rows: int = Field(default=4000, ge=1)
+    max_rows: int | None = None
+
+    @field_validator("max_rows")
+    @classmethod
+    def _max_rows_opt(cls, v: int | None) -> int | None:
+        if v is None:
+            return None
+        if int(v) < 1:
+            raise ValueError("max_rows must be >= 1 when set")
+        return int(v)
 
 
 class IngestConfig(BaseModel):
@@ -57,13 +70,20 @@ class IngestConfig(BaseModel):
     bronze_resumes_jsonl: str = "data/bronze/resumes/resumes_bronze.jsonl"
     bronze_jobs_jsonl: str = "data/bronze/jobs/jobs_bronze.jsonl"
     ranking_sources: list[str] = Field(default_factory=list)
-    cv_corpus_jsonl: IngestCvCorpusJsonlConfig = Field(default_factory=IngestCvCorpusJsonlConfig)
+    ner_corpus_sources: list[str] = Field(default_factory=list)
+    cv_corpus_jsonl: IngestCvCorpusJsonlConfig = Field(
+        default_factory=IngestCvCorpusJsonlConfig
+    )
 
 
 class SilverConfig(BaseModel):
     model_config = {"extra": "forbid"}
 
     unified_resumes: str = "data/silver/unified_resumes.jsonl"
+    resume_profiles: str = "data/silver/resume_profiles.jsonl"
+    job_profiles: str = "data/silver/job_profiles.jsonl"
+    stats_path: str = "data/silver/silver_stats.json"
+    write_silver_on_ingest: bool = True
     write_unified_resumes: bool = False
 
 
@@ -115,7 +135,10 @@ class Bm25Config(BaseModel):
 
 class FusionWeightsConfig(BaseModel):
     """V1 fusion weights — no BM25 channel."""
-    model_config = {"extra": "allow"}  # allow extra channel keys set by weight optimiser
+
+    model_config = {
+        "extra": "allow"
+    }  # allow extra channel keys set by weight optimiser
 
     tfidf: float = Field(default=0.35, ge=0.0, le=1.0)
     dense: float = Field(default=0.35, ge=0.0, le=1.0)
@@ -131,6 +154,7 @@ class FusionConfig(BaseModel):
 
 class FusionV2WeightsConfig(BaseModel):
     """V2 fusion weights — includes BM25 channel."""
+
     model_config = {"extra": "allow"}
 
     tfidf: float = Field(default=0.25, ge=0.0, le=1.0)
@@ -161,7 +185,9 @@ class EvaluationConfig(BaseModel):
     @classmethod
     def _check_ks(cls, v: list[int]) -> list[int]:
         if not v or any(k < 1 for k in v):
-            raise ValueError("top_k_values must be a non-empty list of positive integers")
+            raise ValueError(
+                "top_k_values must be a non-empty list of positive integers"
+            )
         return v
 
 
@@ -195,6 +221,7 @@ class LoggingConfig(BaseModel):
 # Root config model
 # ---------------------------------------------------------------------------
 
+
 class PipelineConfig(BaseModel):
     model_config = {"extra": "forbid"}
 
@@ -218,6 +245,7 @@ class PipelineConfig(BaseModel):
     @model_validator(mode="after")
     def _warn_anonymize_off(self) -> "PipelineConfig":
         import logging as _logging
+
         if not self.privacy.anonymize:
             _logging.getLogger(__name__).warning(
                 "CONFIG: privacy.anonymize=false — PII will NOT be redacted. "

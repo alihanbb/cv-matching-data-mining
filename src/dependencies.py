@@ -17,6 +17,7 @@ def require_sentence_transformers():
     """Return the ``sentence_transformers`` module or raise an informative error."""
     try:
         import sentence_transformers  # noqa: PLC0415
+
         return sentence_transformers
     except ImportError as exc:
         raise ImportError(
@@ -29,6 +30,7 @@ def require_rank_bm25():
     """Return the ``rank_bm25`` module or raise an informative error."""
     try:
         import rank_bm25  # noqa: PLC0415
+
         return rank_bm25
     except ImportError as exc:
         raise ImportError(
@@ -41,6 +43,7 @@ def require_torch():
     """Return the ``torch`` module or raise an informative error."""
     try:
         import torch  # noqa: PLC0415
+
         return torch
     except ImportError as exc:
         raise ImportError(
@@ -53,6 +56,7 @@ def try_import_sentence_transformers():
     """Return ``sentence_transformers`` module, or ``None`` if unavailable."""
     try:
         import sentence_transformers  # noqa: PLC0415
+
         return sentence_transformers
     except ImportError:
         logger.warning(
@@ -66,6 +70,7 @@ def try_import_rank_bm25():
     """Return ``rank_bm25`` module, or ``None`` if unavailable."""
     try:
         import rank_bm25  # noqa: PLC0415
+
         return rank_bm25
     except ImportError:
         logger.warning(

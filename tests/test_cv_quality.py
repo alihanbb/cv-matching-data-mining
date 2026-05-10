@@ -12,4 +12,6 @@ def test_cv_quality_increases_with_sections() -> None:
     rich = segment_cv(
         "Skills\nPython\nExperience\n3 years\nEducation\nBS CS\nProjects\nApp\nCertificates\nAWS"
     )
-    assert cv_quality_score(rich, "\n".join(rich.values())) >= cv_quality_score(minimal, "just text")
+    assert cv_quality_score(rich, "\n".join(rich.values())) >= cv_quality_score(
+        minimal, "just text"
+    )

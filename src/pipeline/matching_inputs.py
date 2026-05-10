@@ -8,7 +8,11 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from src.extraction.experience_extractor import cv_max_years, extract_experience_signals, extract_job_required_years
+from src.extraction.experience_extractor import (
+    cv_max_years,
+    extract_experience_signals,
+    extract_job_required_years,
+)
 from src.extraction.requirements_extractor import (
     JobRequirements,
     extract_job_requirements,
@@ -17,7 +21,11 @@ from src.extraction.requirements_extractor import (
 from src.extraction.skill_extractor import extract_skill_ids_sets_for_corpus
 from src.extraction.skills_lexicon import SkillsLexicon, load_skills_lexicon
 from src.features.bm25_scorer import bm25_matrix
-from src.features.semantic_encoder import dense_cosine_similarity, encode_normalized, try_load_semantic_encoder
+from src.features.semantic_encoder import (
+    dense_cosine_similarity,
+    encode_normalized,
+    try_load_semantic_encoder,
+)
 from src.features.tfidf_vectorizer import TfidfFeatureBuilder
 from src.pipeline.io import read_processed_csv
 from src.preprocessing.cleaner import TextCleaner
@@ -88,7 +96,9 @@ def build_matching_matrices(
     ``compare_models.py`` all call this function rather than rebuilding
     matrices independently.
     """
-    from src.config.defaults import FUSION_V1_WEIGHTS  # noqa: F401 — triggers defaults load
+    from src.config.defaults import (
+        FUSION_V1_WEIGHTS,
+    )  # noqa: F401 — triggers defaults load
 
     paths = cfg["paths"]
     proc_cvs = resolve_path(root, paths["processed_cvs"])
@@ -118,6 +128,22 @@ def build_matching_matrices(
     job_text_col = "raw_text" if "raw_text" in raw_jobs.columns else "text"
     cvs = validate_processed_df(raw_cvs, "cv_id", cv_text_col)
     jobs = validate_processed_df(raw_jobs, "job_id", job_text_col)
+    if "source" in raw_cvs.columns:
+        src_df = raw_cvs[["cv_id", "source"]].drop_duplicates(
+            subset=["cv_id"], keep="first"
+        )
+        cvs = cvs.merge(src_df, on="cv_id", how="left")
+        cvs["source"] = cvs["source"].fillna("").astype(str)
+    else:
+        cvs["source"] = ""
+    if "source" in raw_jobs.columns:
+        js_df = raw_jobs[["job_id", "source"]].drop_duplicates(
+            subset=["job_id"], keep="first"
+        )
+        jobs = jobs.merge(js_df, on="job_id", how="left")
+        jobs["source"] = jobs["source"].fillna("").astype(str)
+    else:
+        jobs["source"] = ""
     if cv_text_col != "text":
         cvs = cvs.rename(columns={cv_text_col: "text"})
     if job_text_col != "text":
@@ -125,8 +151,12 @@ def build_matching_matrices(
     if cvs.empty or jobs.empty:
         raise ValueError("Processed CV or job tables are empty — run ingest first.")
 
-    src_cv_text = cvs["text"].map(lambda t: anonymize_text(str(t)) if anonymize else str(t))
-    src_job_text = jobs["text"].map(lambda t: anonymize_text(str(t)) if anonymize else str(t))
+    src_cv_text = cvs["text"].map(
+        lambda t: anonymize_text(str(t)) if anonymize else str(t)
+    )
+    src_job_text = jobs["text"].map(
+        lambda t: anonymize_text(str(t)) if anonymize else str(t)
+    )
     cvs = cvs.assign(_work_text=src_cv_text)
     jobs = jobs.assign(_work_text=src_job_text)
     cvs["clean_text"] = cvs["_work_text"].map(cleaner.clean)
@@ -137,16 +167,25 @@ def build_matching_matrices(
 
     # Skill extraction
     cv_skill_sets = extract_skill_ids_sets_for_corpus(cvs["_work_text"].tolist(), lex)
-    job_reqs = [extract_job_requirements(str(t), lex) for t in jobs["_work_text"].tolist()]
+    job_reqs = [
+        extract_job_requirements(str(t), lex) for t in jobs["_work_text"].tolist()
+    ]
     job_skill_sets = [r.must_have | r.nice_to_have for r in job_reqs]
 
     # Coverage matrices
-    must_cov_m, nice_cov_m, skill_score_m = requirement_coverage_matrix(cv_skill_sets, job_reqs)
+    must_cov_m, nice_cov_m, skill_score_m = requirement_coverage_matrix(
+        cv_skill_sets, job_reqs
+    )
     jaccard_mat = skill_jaccard_matrix(cv_skill_sets, job_skill_sets)
 
     # Experience
-    cv_years_list = [float(cv_max_years(extract_experience_signals(str(t)))) for t in cvs["_work_text"].tolist()]
-    job_req_years = [extract_job_required_years(str(t)) for t in jobs["_work_text"].tolist()]
+    cv_years_list = [
+        float(cv_max_years(extract_experience_signals(str(t))))
+        for t in cvs["_work_text"].tolist()
+    ]
+    job_req_years = [
+        extract_job_required_years(str(t)) for t in jobs["_work_text"].tolist()
+    ]
     exp_mat = experience_match_matrix(cv_years_list, job_req_years)
 
     # TF-IDF
@@ -163,7 +202,11 @@ def build_matching_matrices(
     dense_enabled = bool(semantic and emb_cfg.get("enabled", True))
     dense_sim: np.ndarray | None = None
     if dense_enabled:
-        from src.config.defaults import DEFAULT_EMBEDDING_BATCH_SIZE, DEFAULT_EMBEDDING_MODEL
+        from src.config.defaults import (
+            DEFAULT_EMBEDDING_BATCH_SIZE,
+            DEFAULT_EMBEDDING_MODEL,
+        )
+
         model = try_load_semantic_encoder(
             emb_cfg.get("model_name", DEFAULT_EMBEDDING_MODEL),
             device=emb_cfg.get("device"),
@@ -173,7 +216,9 @@ def build_matching_matrices(
             logger.warning("Semantic encoder unavailable — dense channel disabled.")
         else:
             bs = int(emb_cfg.get("batch_size", DEFAULT_EMBEDDING_BATCH_SIZE))
-            logger.info("Encoding %d CVs and %d jobs with dense model", len(cvs), len(jobs))
+            logger.info(
+                "Encoding %d CVs and %d jobs with dense model", len(cvs), len(jobs)
+            )
             e_cv = encode_normalized(model, cvs["clean_text"].tolist(), bs)
             e_job = encode_normalized(model, jobs["clean_text"].tolist(), bs)
             dense_sim = np.clip(dense_cosine_similarity(e_cv, e_job), 0.0, 1.0)
@@ -184,7 +229,9 @@ def build_matching_matrices(
     bm25_enabled = bool(bm25 or bm25_cfg.get("enabled", False))
     if bm25_enabled:
         try:
-            bm25_mat = bm25_matrix(jobs["clean_text"].tolist(), cvs["clean_text"].tolist())
+            bm25_mat = bm25_matrix(
+                jobs["clean_text"].tolist(), cvs["clean_text"].tolist()
+            )
         except ImportError as exc:
             logger.warning("BM25 unavailable — channel disabled: %s", exc)
             bm25_enabled = False
@@ -223,5 +270,12 @@ def rankings_from_fused(
         col = fused[:, j]
         order = np.argsort(-col)
         for rank, idx in enumerate(order[:top_k], start=1):
-            rows.append({"job_id": jid, "cv_id": cv_ids[idx], "score": float(col[idx]), "rank_for_job": rank})
+            rows.append(
+                {
+                    "job_id": jid,
+                    "cv_id": cv_ids[idx],
+                    "score": float(col[idx]),
+                    "rank_for_job": rank,
+                }
+            )
     return pd.DataFrame(rows)

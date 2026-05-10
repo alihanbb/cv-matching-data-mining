@@ -26,10 +26,16 @@ dashboard = ["streamlit>=1.30.0", "matplotlib>=3.7.0"]
 training = ["torch>=2.0.0"]
 data_imports = ["datasets>=2.14.0", "huggingface_hub>=0.20.0"]
 kaggle_import = ["kaggle>=1.6.0"]
-dev = ["pytest>=7.4.0"]
+dev = ["pytest>=7.4.0", "black>=24.3.0"]
+
+[tool.setuptools.packages.find]
 where = ["."]
 include = ["src*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.black]
+target-version = ["py310", "py311", "py312", "py313"]
+line-length = 100

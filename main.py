@@ -27,7 +27,9 @@ def _apply_best_weights(cfg: dict, root: Path) -> None:
     w = payload.get("weights", {})
     if not w:
         raise ValueError(f"Invalid weights file: {art}")
-    cfg.setdefault("fusion", {})["weights"] = {k: float(v) for k, v in w.items() if k != "bm25"}
+    cfg.setdefault("fusion", {})["weights"] = {
+        k: float(v) for k, v in w.items() if k != "bm25"
+    }
     bm25_v = float(w.get("bm25", 0.0) or 0.0)
     if bm25_v > 0:
         cfg.setdefault("bm25", {})["enabled"] = True
@@ -69,7 +71,11 @@ def main() -> None:
         help="Skip offline evaluation even if ground_truth.csv exists",
     )
 
-    ap.add_argument("--bm25", action="store_true", help="Enable BM25 channel and Hybrid V2 ranking fusion")
+    ap.add_argument(
+        "--bm25",
+        action="store_true",
+        help="Enable BM25 channel and Hybrid V2 ranking fusion",
+    )
     ap.add_argument(
         "--optimize-weights",
         action="store_true",
@@ -103,10 +109,12 @@ def main() -> None:
     # Validate config against schema at startup — catches typos / bad values early.
     from src.config.schema import PipelineConfig
     from pydantic import ValidationError
+
     try:
         PipelineConfig.model_validate(cfg)
     except ValidationError as exc:
         import sys
+
         print(f"[CONFIG ERROR] config.yaml failed validation:\n{exc}", file=sys.stderr)
         sys.exit(1)
 
@@ -140,7 +148,9 @@ def main() -> None:
         return
 
     if args.rerank:
-        explain_path = root / "data" / "gold" / "rankings" / "candidate_scores_explained.csv"
+        explain_path = (
+            root / "data" / "gold" / "rankings" / "candidate_scores_explained.csv"
+        )
         if not explain_path.is_file():
             raise FileNotFoundError(
                 f"Missing {explain_path}. Run python main.py (with --bm25 recommended) first."

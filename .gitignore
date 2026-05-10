@@ -10,6 +10,8 @@ dist/
 build/
 data/bronze/
 data/silver/
+data/gold/
+data/external/
 *.docx
 *.pdf
 *.zip

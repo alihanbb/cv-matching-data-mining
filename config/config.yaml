@@ -4,6 +4,10 @@ paths:
   tfidf_model: data/gold/models/tfidf_model.pkl
   output_rankings: data/gold/rankings/candidate_scores.csv
   output_explanations: data/gold/rankings/candidate_scores_explained.csv
+  top_candidates_csv: data/gold/rankings/top_candidates_by_job.csv
+  evaluation_results_csv: data/gold/evaluation/evaluation_results.csv
+  model_comparison_csv: data/gold/evaluation/model_comparison.csv
+  score_audit_report_csv: data/gold/evaluation/score_audit_report.csv
   ground_truth: data/evaluation/ground_truth.csv
 
 skills:
@@ -14,8 +18,17 @@ ingest:
   raw_jobs_dir: data/bronze/job_descriptions
   bronze_resumes_jsonl: data/bronze/resumes/resumes_bronze.jsonl
   bronze_jobs_jsonl: data/bronze/jobs/jobs_bronze.jsonl
-  # Non-empty list restricts CV rows loaded from Bronze JSONL / optional corpus JSONL to these ``source`` tags.
-  ranking_sources: []
+  # Restricts CV rows loaded from Bronze JSONL / optional corpus JSONL to ranking candidates.
+  ranking_sources:
+    - vacancy_resume_matching
+    - sample
+    - huggingface_cv_matcher
+  # NER-labelled sources: profiled for Silver / corpus, not used alone as ranking candidates when filtered out above.
+  ner_corpus_sources:
+    - dataturks_resume_ner_train
+    - dataturks_resume_ner_test
+    - mehyar_ner_annotated_cv
+    - nlp_ner_on_resume_json_demo
   cv_corpus_jsonl:
     enabled: true
     path: data/silver/unified_resumes.jsonl
@@ -26,6 +39,10 @@ ingest:
 
 silver:
   unified_resumes: data/silver/unified_resumes.jsonl
+  resume_profiles: data/silver/resume_profiles.jsonl
+  job_profiles: data/silver/job_profiles.jsonl
+  stats_path: data/silver/silver_stats.json
+  write_silver_on_ingest: true
   write_unified_resumes: false
 
 privacy:

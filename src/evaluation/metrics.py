@@ -63,7 +63,9 @@ def recall_at_k(ranked: pd.DataFrame, ground_truth: pd.DataFrame, k: int) -> flo
         return 0.0
     recalls: list[float] = []
     for job, rel in by_job.items():
-        top = ranked[(ranked["job_id"].astype(str) == job) & (ranked["rank_for_job"] <= k)]
+        top = ranked[
+            (ranked["job_id"].astype(str) == job) & (ranked["rank_for_job"] <= k)
+        ]
         retrieved = set(top["cv_id"].astype(str).tolist())
         if not rel:
             continue

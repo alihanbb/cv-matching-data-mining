@@ -1,4 +1,8 @@
-from src.extraction.requirements_extractor import extract_job_requirements, pair_requirement_summary, skill_score_from_coverage
+from src.extraction.requirements_extractor import (
+    extract_job_requirements,
+    pair_requirement_summary,
+    skill_score_from_coverage,
+)
 from src.extraction.skills_lexicon import load_skills_lexicon
 from src.utils.helpers import project_root
 

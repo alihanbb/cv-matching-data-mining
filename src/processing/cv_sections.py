@@ -8,12 +8,35 @@ from typing import Any
 from src.config.defaults import CV_QUALITY_WEIGHTS, CV_QUALITY_MEASURABLE_DIVISOR
 
 _SECTION_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("summary", re.compile(r"\b(profile|summary|objective|about me|öz|özet|profil)\b", re.I)),
-    ("skills", re.compile(r"\b(skills|technologies|tech stack|yetenek|teknik beceriler)\b", re.I)),
-    ("experience", re.compile(r"\b(experience|employment|work history|iş deneyimi|deneyim|tecrübe|tecrube)\b", re.I)),
+    (
+        "summary",
+        re.compile(r"\b(profile|summary|objective|about me|öz|özet|profil)\b", re.I),
+    ),
+    (
+        "skills",
+        re.compile(
+            r"\b(skills|technologies|tech stack|yetenek|teknik beceriler)\b", re.I
+        ),
+    ),
+    (
+        "experience",
+        re.compile(
+            r"\b(experience|employment|work history|iş deneyimi|deneyim|tecrübe|tecrube)\b",
+            re.I,
+        ),
+    ),
     ("projects", re.compile(r"\b(projects|portfolio|proje|projeler)\b", re.I)),
-    ("education", re.compile(r"\b(education|academic|üniversite|eğitim|eğitim)\b", re.I)),
-    ("certificates", re.compile(r"\b(certificates|certifications|licenses|language|diller|sertifika)\b", re.I)),
+    (
+        "education",
+        re.compile(r"\b(education|academic|üniversite|eğitim|eğitim)\b", re.I),
+    ),
+    (
+        "certificates",
+        re.compile(
+            r"\b(certificates|certifications|licenses|language|diller|sertifika)\b",
+            re.I,
+        ),
+    ),
 ]
 
 

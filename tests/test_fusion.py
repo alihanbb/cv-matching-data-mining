@@ -22,7 +22,14 @@ def test_fuse_without_dense():
     tfidf = np.array([[0.2, 0.8], [0.9, 0.1]], dtype=float)
     skills = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=float)
     exp = np.ones_like(tfidf)
-    fused, w = fuse_scores(tfidf, None, skills, exp, {"tfidf": 1, "dense": 1, "skills": 1, "experience": 1}, False)
+    fused, w = fuse_scores(
+        tfidf,
+        None,
+        skills,
+        exp,
+        {"tfidf": 1, "dense": 1, "skills": 1, "experience": 1},
+        False,
+    )
     assert fused.shape == tfidf.shape
     assert abs(sum(w.values()) - 1.0) < 1e-6
     assert w["dense"] == 0.0
@@ -47,5 +54,13 @@ def test_fuse_weighted_raw_sum():
     dense = np.array([[0.5, 0.5]], dtype=float)
     skills = np.array([[1.0, 0.0]], dtype=float)
     exp = np.ones_like(tfidf)
-    fused, w = fuse_weighted_raw(tfidf, dense, skills, exp, {"tfidf": 0.5, "dense": 0.5, "skills": 0, "experience": 0}, True, bm25=None)
+    fused, w = fuse_weighted_raw(
+        tfidf,
+        dense,
+        skills,
+        exp,
+        {"tfidf": 0.5, "dense": 0.5, "skills": 0, "experience": 0},
+        True,
+        bm25=None,
+    )
     assert abs(float(fused[0, 0]) - 0.5) < 1e-9

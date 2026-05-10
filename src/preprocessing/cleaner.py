@@ -21,7 +21,11 @@ def _ensure_nltk_resources() -> None:
         return
     for pkg in ("punkt", "punkt_tab", "stopwords", "wordnet", "omw-1.4"):
         try:
-            nltk.data.find(f"corpora/{pkg}" if pkg in ("stopwords", "wordnet") else f"tokenizers/{pkg}")
+            nltk.data.find(
+                f"corpora/{pkg}"
+                if pkg in ("stopwords", "wordnet")
+                else f"tokenizers/{pkg}"
+            )
         except LookupError:
             try:
                 nltk.download(pkg, quiet=True)
@@ -46,7 +50,9 @@ class TextCleaner:
         if remove_stopwords and stopwords is not None:
             _ensure_nltk_resources()
             try:
-                self._stop |= set(stopwords.words("english" if language == "en" else language))
+                self._stop |= set(
+                    stopwords.words("english" if language == "en" else language)
+                )
             except OSError:
                 self._stop |= set()
         if self.lemmatize:
@@ -59,7 +65,9 @@ class TextCleaner:
         if not isinstance(text, str):
             return ""
         lower = text.lower()
-        no_punct = lower.translate(str.maketrans("", "", string.punctuation.replace("#", "").replace("+", "")))
+        no_punct = lower.translate(
+            str.maketrans("", "", string.punctuation.replace("#", "").replace("+", ""))
+        )
         no_punct = re.sub(r"\s+", " ", no_punct).strip()
         tokens = tokenize(no_punct)
         if self.remove_stopwords and self._stop:

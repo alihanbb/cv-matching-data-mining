@@ -18,7 +18,9 @@ def main() -> None:
     try:
         from datasets import load_dataset
     except ImportError as e:
-        raise SystemExit("Install optional extra: pip install -e \".[data_imports]\"") from e
+        raise SystemExit(
+            'Install optional extra: pip install -e ".[data_imports]"'
+        ) from e
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
@@ -44,17 +46,33 @@ def main() -> None:
             (bronze_job / f"job__{rid}.txt").write_text(job_text, encoding="utf-8")
         if "label" in r or "match_score" in r or "relevance" in r:
             rel = int(r.get("relevance", r.get("label", r.get("match_score", 0))))
-            gt_rows.append({"job_id": f"job__{rid}", "cv_id": f"cv__{rid}", "relevance": max(0, min(3, rel))})
+            gt_rows.append(
+                {
+                    "job_id": f"job__{rid}",
+                    "cv_id": f"cv__{rid}",
+                    "relevance": max(0, min(3, rel)),
+                }
+            )
 
     if gt_rows:
         import pandas as pd
 
-        pd.DataFrame(gt_rows).drop_duplicates().to_csv(eval_dir / "ground_truth.csv", index=False)
+        pd.DataFrame(gt_rows).drop_duplicates().to_csv(
+            eval_dir / "ground_truth.csv", index=False
+        )
     (eval_dir / "import_hf_cv_matcher_note.json").write_text(
-        json.dumps({"rows_imported": len(ds), "hint": "Verify column names match the dataset schema."}, indent=2),
+        json.dumps(
+            {
+                "rows_imported": len(ds),
+                "hint": "Verify column names match the dataset schema.",
+            },
+            indent=2,
+        ),
         encoding="utf-8",
     )
-    print(f"Done — CV/job TXT under {bronze_cv} and {bronze_job}. Ground truth rows: {len(gt_rows)}")
+    print(
+        f"Done — CV/job TXT under {bronze_cv} and {bronze_job}. Ground truth rows: {len(gt_rows)}"
+    )
 
 
 if __name__ == "__main__":
