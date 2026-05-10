@@ -105,10 +105,10 @@ def build_processed_from_raw(
                 if not row:
                     continue
                 bronze_profile_rows.append(dict(row))
-                if (
-                    _passes_ranking_filter(row["source"], ranking_sources)
-                    and row["source"] not in ner_only_sources
-                ):
+                passes = _passes_ranking_filter(row["source"], ranking_sources)
+                ner_profile_only = row["source"] in ner_only_sources
+                # If ``ranking_sources`` is set, explicit allow-list wins over NER-only profiling tags.
+                if passes and (not ner_profile_only or ranking_sources):
                     if len(row["raw_text"].strip()) >= SHORT_TEXT_CHARS:
                         ranking_cv_rows.append(dict(row))
                 else:

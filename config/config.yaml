@@ -27,10 +27,16 @@ ingest:
   bronze_ner_annotations_jsonl: data/bronze/annotations/ner_annotations_bronze.jsonl
 
   # Non-empty: only these ``source`` tags enter ranking corpus (JSONL + optional corpus JSONL).
+  # Include external_bronze_import sources so cloned repos feed matching, not only Vanetik CVs.
   ranking_sources:
     - vacancy_resume_matching
     - sample
     - huggingface_cv_matcher
+    - dataturks_resume_ner_train
+    - dataturks_resume_ner_test
+    - mehyar_ner_annotated_cv
+    - nlp_ner_on_resume_json_demo
+    - cv_analysis_pdf_corpus
 
   # Extra NER sources → Silver profiling via JSONL (see cv_corpus_jsonl.path); not standalone ranking buckets.
   ner_corpus_sources:
