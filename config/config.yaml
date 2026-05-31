@@ -27,8 +27,7 @@ ingest:
   bronze_ner_annotations_jsonl: data/bronze/annotations/ner_annotations_bronze.jsonl
   # When true, merge entities from ner_annotations_bronze into rows missing labels (Silver / unified).
   merge_bronze_ner_annotations: true
-
-# Non-empty: only these ``source`` tags enter ranking corpus (JSONL + optional corpus JSONL).
+  # Non-empty: only these ``source`` tags enter ranking corpus (JSONL + optional corpus JSONL).
   ranking_sources:
     - vacancy_resume_matching
     - sample

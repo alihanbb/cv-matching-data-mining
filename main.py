@@ -69,6 +69,7 @@ app = FastAPI(
 # REQUEST / RESPONSE MODELS
 # ============================================================
 
+
 class TextDocument(BaseModel):
     id: Optional[str] = Field(default=None, description="Doküman ID veya dosya adı")
     text: str = Field(..., min_length=1, description="CV veya iş tanımı metni")
@@ -110,6 +111,7 @@ class BatchMatchResponse(BaseModel):
 # MODEL LOADING
 # ============================================================
 
+
 @lru_cache(maxsize=1)
 def get_model() -> SentenceTransformer:
     """Model sadece bir kez yüklenir (LRU cache ile)."""
@@ -119,6 +121,7 @@ def get_model() -> SentenceTransformer:
 # ============================================================
 # TEXT CLEANING / CHUNKING
 # ============================================================
+
 
 def clean_text(text: str) -> str:
     """Null byte ve gereksiz boşlukları temizler; PII'ı maskeler."""
@@ -166,6 +169,7 @@ def chunk_text(
 # EMBEDDING FUNCTIONS
 # ============================================================
 
+
 def average_embeddings(embeddings: np.ndarray) -> np.ndarray:
     averaged = np.mean(embeddings, axis=0)
     norm = np.linalg.norm(averaged)
@@ -204,7 +208,9 @@ def calculate_match_score(job_text: str, cv_text: str) -> float:
     score = cosine_similarity(
         job_embedding.reshape(1, -1),
         cv_embedding.reshape(1, -1),
-    )[0][0]
+    )[
+        0
+    ][0]
     return round(float(score), 5)
 
 
@@ -224,6 +230,7 @@ def interpret_score(score: float) -> str:
 # ============================================================
 # API ENDPOINTS
 # ============================================================
+
 
 @app.get("/health")
 def health_check() -> dict:
@@ -272,14 +279,18 @@ def match_multiple_cvs_with_job_description(payload: BatchMatchRequest) -> Batch
             score = cosine_similarity(
                 job_embedding.reshape(1, -1),
                 cv_embedding.reshape(1, -1),
-            )[0][0]
+            )[
+                0
+            ][0]
             score = round(float(score), 5)
-            rows.append({
-                "cv_id": cv.id,
-                "match_score": score,
-                "match_percentage": round(score * 100, 2),
-                "interpretation": interpret_score(score),
-            })
+            rows.append(
+                {
+                    "cv_id": cv.id,
+                    "match_score": score,
+                    "match_percentage": round(score * 100, 2),
+                    "interpretation": interpret_score(score),
+                }
+            )
 
     except Exception as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
@@ -287,7 +298,7 @@ def match_multiple_cvs_with_job_description(payload: BatchMatchRequest) -> Batch
     rows = sorted(rows, key=lambda item: item["match_score"], reverse=True)
 
     if payload.top_n is not None:
-        rows = rows[:payload.top_n]
+        rows = rows[: payload.top_n]
 
     results = [
         BatchMatchItem(
@@ -304,4 +315,3 @@ def match_multiple_cvs_with_job_description(payload: BatchMatchRequest) -> Batch
         job_description_id=payload.job_description.id,
         results=results,
     )
-
