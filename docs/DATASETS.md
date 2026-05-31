@@ -3,6 +3,8 @@
 This document describes how third-party datasets are brought into the project
 as a **one-time import step** and how they align with the preferred Bronze JSONL schema.
 
+For **field-level schemas, layer sizes, and Turkish corpus profiling**, see **[VERI_YAPILARI_VE_PROFILE.md](VERI_YAPILARI_VE_PROFILE.md)**.
+
 ---
 
 ## Supported Sources
@@ -16,6 +18,29 @@ as a **one-time import step** and how they align with the preferred Bronze JSONL
 
 Full path matching uses the `REPO_ALIASES` map in the import script.
 If a folder is not found, a warning is logged and that source is skipped.
+
+### Local PDF corpus (`cv_analysis/data/data`)
+
+Çok-etiketli özgeçmiş arşivi: her biri bir kategori klasörüdür (`ACCOUNTANT`, `ENGINEERING`, …), içinde `.pdf`/`.docx`/`.txt`/`.md`.
+
+Varsayılan kök (**proje kökünden**) `../data/data` (`cv_analysis` ile `cv-matching-data-mining` yan yanaysa tam olarak `Desktop/cv_analysis/data/data`).
+
+```bash
+# Kaç dosya / kategori (yazım yok)
+python scripts/import_cv_analysis_data_to_bronze.py --dry-run --verbose
+
+# Bronze ``resumes_bronze.jsonl`` ile birleştir (--overwrite mevcut ``source`` kaydını sıfırlar)
+python scripts/import_cv_analysis_data_to_bronze.py --overwrite
+```
+
+Bronze’a yazılan `source` etiketi: **`cv_analysis_pdf_corpus`** (`resume_id`: `cv_pdf_<kategori>_<göreceli_yol>`).
+Sıralama korpusuna almak için `config.yaml` içinde `ingest.ranking_sources` listesinde bu etiket bulunmalıdır (varsayılan repoda ekli).
+
+Özel klasör için:
+
+```bash
+python scripts/import_cv_analysis_data_to_bronze.py --corpus-root "D:/parcalar/pdf_korpus" --overwrite
+```
 
 ---
 
@@ -63,6 +88,7 @@ python scripts/import_external_repos_to_bronze.py --source-root .. --source vane
 | ------------------------ | ---------------------------------------------------------------- |
 | **Vanetik**              | Ranking corpus + evaluation base (job–CV pairs, GT template)     |
 | **DataTurks / Mehyar**   | Silver profile / NER; aligned via `ner_corpus_sources` in config |
+| **Sıralı klasör PDF’leri (`../data/data`)** | `import_cv_analysis_data_to_bronze.py` ile Bronze; source `cv_analysis_pdf_corpus` |
 | **NLP\_NER\_ON\_RESUME** | Schema reference; sample volume may be small                     |
 
 `ingest.ranking_sources` in `config/config.yaml` controls which `source`-tagged rows

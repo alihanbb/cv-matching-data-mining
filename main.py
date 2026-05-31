@@ -1,171 +1,307 @@
-#!/usr/bin/env python3
-"""CV Matching Data Mining — multi-channel scoring pipeline entrypoint."""
+"""Standalone CV – Job Description Matching API.
 
-from __future__ import annotations
+Tek bir embedding kanalına (BAAI/bge-m3) dayanan, bağımsız çalışabilen
+hafif bir REST API'dir. Tam pipeline (TF-IDF + BM25 + skill extraction +
+fusion) için ``api/main.py``'yi (``uvicorn api.main:app``) kullanın.
 
-import argparse
-import json
+Başlatmak için:
+    uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+"""
+
+from functools import lru_cache
+from typing import List, Optional
+import re
+import sys
 from pathlib import Path
 
-from src.evaluation.compare_models import evaluate_models
-from src.models.cross_encoder_rerank import rerank_with_cross_encoder
-from src.pipeline.orchestrator import run_full_pipeline
-from src.training.learned_fusion import train_learned_fusion
-from src.training.weight_optimizer import optimize_weights
-from src.utils.helpers import load_config
-from src.utils.logging_config import setup_logging
+import numpy as np
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+
+# ---------------------------------------------------------------------------
+# src/ altyapısını kullan (projenin kökü sys.path'te değilse ekle)
+# ---------------------------------------------------------------------------
+_PROJECT_ROOT = Path(__file__).resolve().parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
+try:
+    from src.preprocessing.cleaner import TextCleaner
+    from src.preprocessing.pii import anonymize_text
+    from src.config.defaults import SEMANTIC_LOW_THRESHOLD
+
+    _cleaner = TextCleaner(remove_stopwords=False, lemmatize=False)
+    _USE_SRC = True
+except ImportError:
+    # Bağımsız kurulumda src/ yoksa basit fallback kullan
+    _USE_SRC = False
+    SEMANTIC_LOW_THRESHOLD = 0.35  # type: ignore[assignment]
 
 
-def _apply_best_weights(cfg: dict, root: Path) -> None:
-    art = root / "artifacts" / "best_fusion_weights.json"
-    if not art.is_file():
-        raise FileNotFoundError(
-            f"Optimized weights not found: {art}\nRun: python main.py --optimize-weights"
+# ============================================================
+# SETTINGS
+# ============================================================
+
+MODEL_NAME = "BAAI/bge-m3"
+BATCH_SIZE = 8
+CHUNK_WORD_SIZE = 350
+CHUNK_OVERLAP = 70
+
+
+# ============================================================
+# FASTAPI APP
+# ============================================================
+
+app = FastAPI(
+    title="CV - Job Description Matching API",
+    description=(
+        "JSON olarak gelen iş tanımı ve CV metnini embedding ile karşılaştırır "
+        "ve uygunluk skorunu JSON olarak döner. "
+        "Tam pipeline için api/main.py'yi kullanın."
+    ),
+    version="1.0.0",
+)
+
+
+# ============================================================
+# REQUEST / RESPONSE MODELS
+# ============================================================
+
+class TextDocument(BaseModel):
+    id: Optional[str] = Field(default=None, description="Doküman ID veya dosya adı")
+    text: str = Field(..., min_length=1, description="CV veya iş tanımı metni")
+
+
+class MatchRequest(BaseModel):
+    job_description: TextDocument
+    cv: TextDocument
+
+
+class MatchResponse(BaseModel):
+    job_description_id: Optional[str]
+    cv_id: Optional[str]
+    match_score: float
+    match_percentage: float
+    interpretation: str
+
+
+class BatchMatchRequest(BaseModel):
+    job_description: TextDocument
+    cvs: List[TextDocument] = Field(..., min_length=1)
+    top_n: Optional[int] = Field(default=None, ge=1, description="İstenirse en iyi N CV döndürülür")
+
+
+class BatchMatchItem(BaseModel):
+    rank: int
+    cv_id: Optional[str]
+    match_score: float
+    match_percentage: float
+    interpretation: str
+
+
+class BatchMatchResponse(BaseModel):
+    job_description_id: Optional[str]
+    results: List[BatchMatchItem]
+
+
+# ============================================================
+# MODEL LOADING
+# ============================================================
+
+@lru_cache(maxsize=1)
+def get_model() -> SentenceTransformer:
+    """Model sadece bir kez yüklenir (LRU cache ile)."""
+    return SentenceTransformer(MODEL_NAME)
+
+
+# ============================================================
+# TEXT CLEANING / CHUNKING
+# ============================================================
+
+def clean_text(text: str) -> str:
+    """Null byte ve gereksiz boşlukları temizler; PII'ı maskeler."""
+    text = text.replace("\x00", " ")
+    text = re.sub(r"\s+", " ", text)
+    cleaned = text.strip()
+
+    if _USE_SRC:
+        # PII anonymize (e-posta, telefon, URL, adres)
+        cleaned = anonymize_text(cleaned)
+
+    return cleaned
+
+
+def chunk_text(
+    text: str,
+    chunk_word_size: int = CHUNK_WORD_SIZE,
+    overlap: int = CHUNK_OVERLAP,
+) -> List[str]:
+    words = text.split()
+
+    if not words:
+        return []
+
+    if len(words) <= chunk_word_size:
+        return [text]
+
+    chunks: List[str] = []
+    start = 0
+
+    while start < len(words):
+        end = start + chunk_word_size
+        chunk = " ".join(words[start:end])
+        chunks.append(chunk)
+
+        if end >= len(words):
+            break
+
+        start = end - overlap
+
+    return chunks
+
+
+# ============================================================
+# EMBEDDING FUNCTIONS
+# ============================================================
+
+def average_embeddings(embeddings: np.ndarray) -> np.ndarray:
+    averaged = np.mean(embeddings, axis=0)
+    norm = np.linalg.norm(averaged)
+    return averaged if norm == 0 else averaged / norm
+
+
+def encode_long_text(
+    model: SentenceTransformer,
+    text: str,
+    batch_size: int = BATCH_SIZE,
+) -> np.ndarray:
+    cleaned = clean_text(text)
+
+    if not cleaned:
+        raise ValueError("Text is empty after cleaning")
+
+    chunks = chunk_text(cleaned)
+
+    if not chunks:
+        raise ValueError("No valid chunks created from text")
+
+    chunk_embeddings = model.encode(
+        chunks,
+        batch_size=batch_size,
+        show_progress_bar=False,
+        normalize_embeddings=True,
+    )
+
+    return average_embeddings(np.array(chunk_embeddings))
+
+
+def calculate_match_score(job_text: str, cv_text: str) -> float:
+    model = get_model()
+    job_embedding = encode_long_text(model, job_text)
+    cv_embedding = encode_long_text(model, cv_text)
+    score = cosine_similarity(
+        job_embedding.reshape(1, -1),
+        cv_embedding.reshape(1, -1),
+    )[0][0]
+    return round(float(score), 5)
+
+
+def interpret_score(score: float) -> str:
+    """Skor yorumlama — src/config/defaults.py SEMANTIC_LOW_THRESHOLD ile hizalı."""
+    if score >= 0.80:
+        return "Çok yüksek uyum"
+    if score >= 0.65:
+        return "Yüksek uyum"
+    if score >= 0.50:
+        return "Orta uyum"
+    if score >= SEMANTIC_LOW_THRESHOLD:
+        return "Düşük uyum"
+    return "Çok düşük uyum"
+
+
+# ============================================================
+# API ENDPOINTS
+# ============================================================
+
+@app.get("/health")
+def health_check() -> dict:
+    return {
+        "status": "ok",
+        "model_name": MODEL_NAME,
+        "src_infrastructure": _USE_SRC,
+        "note": "Tam pipeline için /api/* endpoint'lerini (api/main.py) kullanın.",
+    }
+
+
+@app.post("/match", response_model=MatchResponse)
+def match_cv_with_job_description(payload: MatchRequest) -> MatchResponse:
+    """Tek bir iş tanımı ile tek bir CV'yi karşılaştırır."""
+    try:
+        score = calculate_match_score(
+            job_text=payload.job_description.text,
+            cv_text=payload.cv.text,
         )
-    with open(art, encoding="utf-8") as f:
-        payload = json.load(f)
-    w = payload.get("weights", {})
-    if not w:
-        raise ValueError(f"Invalid weights file: {art}")
-    cfg.setdefault("fusion", {})["weights"] = {k: float(v) for k, v in w.items() if k != "bm25"}
-    bm25_v = float(w.get("bm25", 0.0) or 0.0)
-    if bm25_v > 0:
-        cfg.setdefault("bm25", {})["enabled"] = True
-        cfg.setdefault("fusion_v2", {})["weights"] = {k: float(v) for k, v in w.items()}
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+    return MatchResponse(
+        job_description_id=payload.job_description.id,
+        cv_id=payload.cv.id,
+        match_score=score,
+        match_percentage=round(score * 100, 2),
+        interpretation=interpret_score(score),
+    )
 
 
-def main() -> None:
-    root = Path(__file__).resolve().parent
-    ap = argparse.ArgumentParser(description="CV–job matching pipeline")
-    ap.add_argument("--config", type=Path, default=None, help="YAML config path")
-
-    ap.add_argument(
-        "--ingest",
-        action="store_true",
-        help="Rebuild Silver CSVs from data/bronze (PDF/DOCX/TXT/MD)",
-    )
-
-    # --- Semantic channel -------------------------------------------------
-    semantic_group = ap.add_mutually_exclusive_group()
-    semantic_group.add_argument(
-        "--semantic",
-        action="store_true",
-        help="Force-enable dense embedding channel (sentence-transformers)",
-    )
-    semantic_group.add_argument(
-        "--no-semantic",
-        action="store_true",
-        help="Force-disable dense embeddings (TF-IDF + structured channels only)",
-    )
-
-    # --- Evaluation toggle -----------------------------------------------
-    eval_group = ap.add_mutually_exclusive_group()
-    eval_group.add_argument(
-        "--evaluate",
-        action="store_true",
-        help="Run offline metrics if the ground_truth file exists; otherwise log and skip (no error)",
-    )
-    eval_group.add_argument(
-        "--no-evaluate",
-        action="store_true",
-        help="Skip offline evaluation even if ground_truth.csv exists",
-    )
-
-    ap.add_argument(
-        "--bm25",
-        action="store_true",
-        help="Enable BM25 channel and Hybrid V2 ranking fusion",
-    )
-    ap.add_argument(
-        "--optimize-weights",
-        action="store_true",
-        help="Grid-search fusion weights to maximize NDCG@5 (needs ground truth)",
-    )
-    ap.add_argument(
-        "--use-best-weights",
-        action="store_true",
-        help="Load artifacts/best_fusion_weights.json into fusion config before run",
-    )
-    ap.add_argument(
-        "--train-fusion",
-        action="store_true",
-        help="Train softmax-constrained fusion on ground truth (PyTorch)",
-    )
-    ap.add_argument(
-        "--rerank",
-        action="store_true",
-        help="Cross-encoder rerank top-20 from explained CSV",
-    )
-    ap.add_argument(
-        "--export-eval-csv",
-        action="store_true",
-        help="Write data/gold/evaluation/*.csv model comparison without full re-run",
-    )
-
-    args = ap.parse_args()
-    cfg = load_config(args.config)
-    setup_logging(cfg.get("logging", {}).get("level", "INFO"))
-
-    # Validate config against schema at startup — catches typos / bad values early.
-    from src.config.schema import PipelineConfig
-    from pydantic import ValidationError
+@app.post("/match-batch", response_model=BatchMatchResponse)
+def match_multiple_cvs_with_job_description(payload: BatchMatchRequest) -> BatchMatchResponse:
+    """
+    Tek bir iş tanımı ile birden fazla CV'yi karşılaştırır.
+    Sonuçları skora göre büyükten küçüğe sıralar.
+    """
+    model = get_model()
 
     try:
-        PipelineConfig.model_validate(cfg)
-    except ValidationError as exc:
-        import sys
+        job_embedding = encode_long_text(model, payload.job_description.text)
 
-        print(f"[CONFIG ERROR] config.yaml failed validation:\n{exc}", file=sys.stderr)
-        sys.exit(1)
+        rows = []
+        for cv in payload.cvs:
+            cv_embedding = encode_long_text(model, cv.text)
+            score = cosine_similarity(
+                job_embedding.reshape(1, -1),
+                cv_embedding.reshape(1, -1),
+            )[0][0]
+            score = round(float(score), 5)
+            rows.append({
+                "cv_id": cv.id,
+                "match_score": score,
+                "match_percentage": round(score * 100, 2),
+                "interpretation": interpret_score(score),
+            })
 
-    if args.use_best_weights:
-        _apply_best_weights(cfg, root)
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
-    if args.semantic:
-        semantic = True
-    elif args.no_semantic:
-        semantic = False
-    else:
-        semantic = bool(cfg.get("embeddings", {}).get("enabled", True))
+    rows = sorted(rows, key=lambda item: item["match_score"], reverse=True)
 
-    if args.evaluate:
-        evaluate_flag: bool | None = True
-    elif args.no_evaluate:
-        evaluate_flag = False
-    else:
-        evaluate_flag = None
+    if payload.top_n is not None:
+        rows = rows[:payload.top_n]
 
-    if args.optimize_weights:
-        optimize_weights(root, cfg, semantic=semantic, use_bm25=args.bm25)
-        return
+    results = [
+        BatchMatchItem(
+            rank=index,
+            cv_id=row["cv_id"],
+            match_score=row["match_score"],
+            match_percentage=row["match_percentage"],
+            interpretation=row["interpretation"],
+        )
+        for index, row in enumerate(rows, start=1)
+    ]
 
-    if args.train_fusion:
-        train_learned_fusion(root, cfg, semantic=semantic)
-        return
-
-    if args.export_eval_csv:
-        evaluate_models(root, cfg, semantic=semantic)
-        return
-
-    if args.rerank:
-        explain_path = root / "data" / "gold" / "rankings" / "candidate_scores_explained.csv"
-        if not explain_path.is_file():
-            raise FileNotFoundError(
-                f"Missing {explain_path}. Run python main.py (with --bm25 recommended) first."
-            )
-        out = rerank_with_cross_encoder(root, cfg, explain_path)
-        out.to_csv(explain_path, index=False)
-        return
-
-    run_full_pipeline(
-        root,
-        cfg,
-        ingest=args.ingest,
-        semantic=semantic,
-        evaluate=evaluate_flag,
-        bm25=args.bm25,
+    return BatchMatchResponse(
+        job_description_id=payload.job_description.id,
+        results=results,
     )
 
-
-if __name__ == "__main__":
-    main()

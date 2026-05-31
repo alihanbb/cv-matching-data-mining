@@ -70,6 +70,7 @@ class IngestConfig(BaseModel):
     bronze_resumes_jsonl: str = "data/bronze/resumes/resumes_bronze.jsonl"
     bronze_jobs_jsonl: str = "data/bronze/jobs/jobs_bronze.jsonl"
     bronze_ner_annotations_jsonl: str = "data/bronze/annotations/ner_annotations_bronze.jsonl"
+    merge_bronze_ner_annotations: bool = True
     ranking_sources: list[str] = Field(default_factory=list)
     ner_corpus_sources: list[str] = Field(default_factory=list)
     cv_corpus_jsonl: IngestCvCorpusJsonlConfig = Field(default_factory=IngestCvCorpusJsonlConfig)
@@ -108,6 +109,9 @@ class TfidfConfig(BaseModel):
     min_df: int = Field(default=1, ge=1)
     max_df: float = Field(default=0.95, gt=0.0, le=1.0)
     sublinear_tf: bool = True
+    norm: str = "l2"
+    use_idf: bool = True
+    smooth_idf: bool = True
 
     @field_validator("ngram_range")
     @classmethod
@@ -130,6 +134,27 @@ class Bm25Config(BaseModel):
     model_config = {"extra": "forbid"}
 
     enabled: bool = False
+
+
+class RerankingConfig(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    enabled: bool = False
+    model_variant: str = "balanced"
+    top_n: int = Field(default=20, ge=1)
+    adaptive: bool = True
+    blend_weight: float = Field(default=0.3, ge=0.0, le=1.0)
+
+
+class LearnedRankingConfig(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    enabled: bool = False
+    model_type: str = "xgboost"
+    n_estimators: int = Field(default=100, ge=1)
+    max_depth: int = Field(default=5, ge=1)
+    learning_rate: float = Field(default=0.1, gt=0.0, le=1.0)
+    use_ensemble: bool = False
 
 
 class FusionWeightsConfig(BaseModel):
@@ -229,6 +254,8 @@ class PipelineConfig(BaseModel):
     tfidf: TfidfConfig = Field(default_factory=TfidfConfig)
     embeddings: EmbeddingsConfig = Field(default_factory=EmbeddingsConfig)
     bm25: Bm25Config = Field(default_factory=Bm25Config)
+    reranking: RerankingConfig = Field(default_factory=RerankingConfig)
+    learned_ranking: LearnedRankingConfig = Field(default_factory=LearnedRankingConfig)
     fusion: FusionConfig = Field(default_factory=FusionConfig)
     fusion_v2: FusionV2Config = Field(default_factory=FusionV2Config)
     matching: MatchingConfig = Field(default_factory=MatchingConfig)

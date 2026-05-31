@@ -13,6 +13,8 @@ def resolve_score_column(df: pd.DataFrame, preferred: str) -> str:
         "final_score_v2_bm25",
         "final_score_v1",
         "final_score",
+        "learned_fusion_score",
+        "final_rerank_score",
         "score",
     ):
         if col in df.columns:

@@ -201,19 +201,26 @@ def run_full_pipeline(
     bm25_enabled_cfg = bool(bm25 or bm25_cfg.get("enabled", False))
     m = build_matching_matrices(root, cfg, semantic=semantic, bm25=bm25_enabled_cfg)
 
-    # Re-save TF-IDF model (build_matching_matrices does not persist it)
-    pre = cfg.get("preprocessing", {})
-    cleaner = TextCleaner(
-        remove_stopwords=pre.get("remove_stopwords", True),
-        lemmatize=pre.get("lemmatize", True),
-        language=pre.get("language", "en"),
-    )
-    tfidf_cfg = cfg.get("tfidf", {})
-    tfidf_builder = TfidfFeatureBuilder(tfidf_cfg)
-    corpus = m.cvs_df["clean_text"].tolist() + m.jobs_df["clean_text"].tolist()
-    tfidf_builder.fit(corpus)
-    ensure_parent(feat_model)
-    tfidf_builder.save(feat_model)
+    # Persist the already-fitted TF-IDF model from build_matching_matrices.
+    # No second fit is needed — re-fitting on the same corpus is redundant and
+    # would waste ~50 % of pipeline time for large corpora.
+    if m.tfidf_builder is not None:
+        ensure_parent(feat_model)
+        m.tfidf_builder.save(feat_model)
+    else:
+        # Fallback: should not happen in normal flow, but guard defensively.
+        pre = cfg.get("preprocessing", {})
+        cleaner = TextCleaner(
+            remove_stopwords=pre.get("remove_stopwords", True),
+            lemmatize=pre.get("lemmatize", True),
+            language=pre.get("language", "en"),
+        )
+        tfidf_cfg = cfg.get("tfidf", {})
+        tfidf_builder = TfidfFeatureBuilder(tfidf_cfg)
+        corpus = m.cvs_df["clean_text"].tolist() + m.jobs_df["clean_text"].tolist()
+        tfidf_builder.fit(corpus)
+        ensure_parent(feat_model)
+        tfidf_builder.save(feat_model)
 
     # ------------------------------------------------------------------
     # Optional unified JSONL output

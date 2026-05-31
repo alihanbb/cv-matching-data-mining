@@ -106,4 +106,6 @@ final_score_v2_bm25 =
 
 ---
 
-*Document version: 2.2 — 2026-05*
+**Related:** [VERI_YAPILARI_VE_PROFILE.md](VERI_YAPILARI_VE_PROFILE.md) (data shapes and sizes).
+
+*Document version: 2.3 — 2026-05*

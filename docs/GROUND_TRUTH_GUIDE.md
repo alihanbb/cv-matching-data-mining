@@ -36,7 +36,8 @@ Kolon adı `relevance` veya `relevant` olabilir (`relevant`’e normalize edilir
 
 ## Kullanım
 
-- `python main.py --evaluate` — pipeline sonunda Precision@K, Recall@K, NDCG@K, MRR, MAP loglanır.
+- `python main.py --evaluate` — pipeline sonunda Precision@K, Recall@K, NDCG@K, MRR, MAP loglanır.  
+  **`ground_truth.csv` eksikse** çalıştırma hata ile durdurulmaz; logda `Evaluation skipped: … not found.` benzeri mesaj görülür.
 - `python main.py --export-eval-csv` — `data/gold/evaluation/` altına model karşılaştırma CSV’leri.
 - `python main.py --optimize-weights` / `--train-fusion` — etiketli çiftler gerektirir; ID’ler `cleaned_cvs.csv` / `cleaned_jobs.csv` ile birebir eşleşmelidir.
 

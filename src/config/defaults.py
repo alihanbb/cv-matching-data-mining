@@ -78,8 +78,17 @@ CROSS_ENCODER_MODEL_NAME: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 # Embedding model defaults
 # ---------------------------------------------------------------------------
 
-DEFAULT_EMBEDDING_MODEL: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-DEFAULT_EMBEDDING_BATCH_SIZE: int = 32
+# Phase 1 Upgrade: bge-m3 - Multi-language, state-of-the-art dense retrieval
+# Alternatives: intfloat/e5-base-v2, BAAI/bge-base-en-v1.5 (English-only)
+DEFAULT_EMBEDDING_MODEL: str = "BAAI/bge-m3"
+DEFAULT_EMBEDDING_BATCH_SIZE: int = 16  # Reduced for bge-m3 (568M params)
+
+# Fallback models for compatibility
+FALLBACK_EMBEDDING_MODELS: list[str] = [
+    "BAAI/bge-m3",
+    "intfloat/e5-base-v2",
+    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+]
 
 # ---------------------------------------------------------------------------
 # Weight optimiser

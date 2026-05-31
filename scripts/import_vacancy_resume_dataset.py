@@ -7,6 +7,8 @@ import argparse
 import json
 from pathlib import Path
 
+from src.utils.id_normalization import normalize_cv_id, normalize_job_id
+
 
 def main() -> None:
     try:
@@ -28,8 +30,10 @@ def main() -> None:
     gt_rows: list[dict] = []
     for i, row in enumerate(ds):
         r = dict(row)
-        cid = str(r.get("resume_id", r.get("cv_id", f"cv_{i}")))
-        jid = str(r.get("vacancy_id", r.get("job_id", f"job_{i}")))
+        raw_cid = str(r.get("resume_id", r.get("cv_id", f"cv_{i + 1:03d}")))
+        raw_jid = str(r.get("vacancy_id", r.get("job_id", f"vacancy_{i + 1:03d}")))
+        cid = normalize_cv_id(raw_cid) or f"vanetik_cv_{i + 1:03d}"
+        jid = normalize_job_id(raw_jid) or f"vanetik_vacancy_{i + 1:03d}"
         cv_text = str(r.get("resume") or r.get("cv_text") or "")
         job_text = str(r.get("vacancy") or r.get("job_text") or "")
         if cv_text.strip():

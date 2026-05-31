@@ -11,7 +11,7 @@ paths:
   evaluation_results_csv: data/gold/evaluation/evaluation_results.csv
   model_comparison_csv: data/gold/evaluation/model_comparison.csv
   score_audit_report_csv: data/gold/evaluation/score_audit_report.csv
-  ground_truth: data/evaluation/ground_truth.csv
+  ground_truth: data/evaluation/ground_truth_filtered.csv
 
 skills:
   path: config/skills.yaml
@@ -25,9 +25,10 @@ ingest:
   bronze_resumes_jsonl: data/bronze/resumes/resumes_bronze.jsonl
   bronze_jobs_jsonl: data/bronze/jobs/jobs_bronze.jsonl
   bronze_ner_annotations_jsonl: data/bronze/annotations/ner_annotations_bronze.jsonl
+  # When true, merge entities from ner_annotations_bronze into rows missing labels (Silver / unified).
+  merge_bronze_ner_annotations: true
 
-  # Non-empty: only these ``source`` tags enter ranking corpus (JSONL + optional corpus JSONL).
-  # Include external_bronze_import sources so cloned repos feed matching, not only Vanetik CVs.
+# Non-empty: only these ``source`` tags enter ranking corpus (JSONL + optional corpus JSONL).
   ranking_sources:
     - vacancy_resume_matching
     - sample
@@ -37,6 +38,9 @@ ingest:
     - mehyar_ner_annotated_cv
     - nlp_ner_on_resume_json_demo
     - cv_analysis_pdf_corpus
+    - kaggle_resume_dataset_2
+    - dataturks_resume_ner_local_train
+    - dataturks_resume_ner_entity_recognition
 
   # Extra NER sources → Silver profiling via JSONL (see cv_corpus_jsonl.path); not standalone ranking buckets.
   ner_corpus_sources:
@@ -44,15 +48,15 @@ ingest:
     - dataturks_resume_ner_test
     - mehyar_ner_annotated_cv
     - nlp_ner_on_resume_json_demo
+    - dataturks_resume_ner_local_train
+    - dataturks_resume_ner_entity_recognition
 
   cv_corpus_jsonl:
-    enabled: true
+    enabled: false  # Disabled for faster testing
     path: data/silver/unified_resumes.jsonl
     id_field: record_id
     text_field: text
     id_prefix: corpus_
-    # Single cap on JSONL corpus rows loaded for ranking augmentation (omit or null = unlimited).
-    max_rows: 12000
 
 # =============================================================================
 # Silver — profiles and incremental JSONL
@@ -74,20 +78,37 @@ preprocessing:
   lemmatize: true
 
 tfidf:
-  max_features: 5000
-  ngram_range: [1, 2]
-  min_df: 1
-  max_df: 0.95
+  # Phase 1 Upgrade: Optimized TF-IDF parameters
+  max_features: 8000  # Increased for better coverage
+  ngram_range: [1, 3]  # Extended to trigrams for phrase matching
+  min_df: 2  # Filter very rare terms
+  max_df: 0.85  # Remove overly common terms
   sublinear_tf: true
+  norm: "l2"
+  use_idf: true
+  smooth_idf: true
 
 embeddings:
   enabled: true
+  # Fallback to faster model for CPU execution
   model_name: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
-  batch_size: 32
+  batch_size: 16
   device: null
 
 bm25:
   enabled: true
+
+# Phase 2 Upgrade: Cross-encoder reranking configuration
+reranking:
+  enabled: true
+  # Model variant: fast, balanced, accurate, msmarco_v2
+  model_variant: balanced
+  # Number of candidates to rerank
+  top_n: 20
+  # Use adaptive two-stage reranking for better accuracy
+  adaptive: true
+  # Blend weight for combining base score with rerank score
+  blend_weight: 0.3
 
 fusion:
   weights:
@@ -104,11 +125,28 @@ fusion_v2:
     skills: 0.20
     experience: 0.10
 
+# Phase 3 Upgrade: Learned ranking configuration
+learned_ranking:
+  enabled: true
+  # Model type: xgboost, lightgbm, ensemble
+  model_type: xgboost
+  # Number of boosting rounds
+  n_estimators: 100
+  # Maximum tree depth
+  max_depth: 5
+  # Learning rate
+  learning_rate: 0.1
+  # Use ensemble of multiple models
+  use_ensemble: false
+
 matching:
   top_k: 10
 
 evaluation:
   top_k_values: [1, 3, 5]
+  # eval_top_k: pool size used ONLY for evaluation ranking (not saved to output files).
+  # Should be >= number of unique cv_ids in ground_truth to ensure full coverage.
+  eval_top_k: 50
 
 pipeline:
   write_explanations: true

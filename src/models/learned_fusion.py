@@ -10,6 +10,27 @@ from src.utils.id_normalization import normalize_cv_id, normalize_job_id
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Model definition — module-level so torch.save / torch.load can resolve the
+# class by its fully-qualified name regardless of call site.
+# ---------------------------------------------------------------------------
+try:
+    import torch
+    import torch.nn as nn
+
+    class LearnedFusionLinear(nn.Module):
+        """Single-layer linear model for learned score fusion."""
+
+        def __init__(self, input_dim: int) -> None:
+            super().__init__()
+            self.linear = nn.Linear(input_dim, 1)
+
+        def forward(self, x: "torch.Tensor") -> "torch.Tensor":
+            return torch.sigmoid(self.linear(x))
+
+except ImportError:
+    LearnedFusionLinear = None  # type: ignore[assignment,misc]
+
 DEFAULT_FEATURE_COLS: list[str] = [
     "tfidf_score",
     "semantic_score",
@@ -18,6 +39,8 @@ DEFAULT_FEATURE_COLS: list[str] = [
     "experience_score",
     "must_have_coverage",
 ]
+
+MIN_ALIGNMENT_RATIO = 0.5
 
 
 def _normalize_relevance(v: object) -> float:
@@ -49,6 +72,21 @@ def _normalize_gt_df(ground_truth_df: pd.DataFrame, target_col: str) -> pd.DataF
     return gt
 
 
+def _alignment_stats(gt_df: pd.DataFrame, score_df: pd.DataFrame) -> dict[str, int | float]:
+    pairs = score_df[["job_id", "cv_id"]].drop_duplicates()
+    merged = gt_df[["job_id", "cv_id"]].merge(pairs, on=["job_id", "cv_id"], how="left", indicator=True)
+    total_gt = int(len(gt_df))
+    matched_gt = int((merged["_merge"] == "both").sum())
+    unmatched_gt = total_gt - matched_gt
+    match_ratio = (matched_gt / total_gt) if total_gt else 0.0
+    return {
+        "total_ground_truth_rows": total_gt,
+        "matched_ground_truth_rows": matched_gt,
+        "unmatched_ground_truth_rows": unmatched_gt,
+        "match_ratio": float(match_ratio),
+    }
+
+
 def prepare_training_data(
     scores_df: pd.DataFrame,
     ground_truth_df: pd.DataFrame,
@@ -70,23 +108,25 @@ def prepare_training_data(
         score[col] = pd.to_numeric(score[col], errors="coerce").fillna(0.0)
 
     gt = _normalize_gt_df(ground_truth_df, target_col=target_col)
-    merged = gt.merge(score, on=["job_id", "cv_id"], how="inner")
-    merged = merged.dropna(subset=[target_col])
-    total_gt = int(len(gt))
-    matched_gt = int(len(merged[["job_id", "cv_id"]].drop_duplicates()))
-    unmatched_gt = total_gt - matched_gt
+    stats = _alignment_stats(gt, score)
+    total_gt = int(stats["total_ground_truth_rows"])
+    matched_gt = int(stats["matched_ground_truth_rows"])
+    unmatched_gt = int(stats["unmatched_ground_truth_rows"])
+    match_ratio = float(stats["match_ratio"])
     logger.info(
-        "Learned fusion training alignment: total_ground_truth_rows=%d matched_ground_truth_rows=%d unmatched_ground_truth_rows=%d",
+        "Learned fusion training alignment: total_ground_truth_rows=%d matched_ground_truth_rows=%d "
+        "unmatched_ground_truth_rows=%d match_ratio=%.4f",
         total_gt,
         matched_gt,
         unmatched_gt,
+        match_ratio,
     )
-    if total_gt > 0 and (matched_gt / total_gt) < 0.10:
-        logger.warning(
-            "Learned fusion training alignment is very low (matched_ground_truth_rows=%d/%d).",
-            matched_gt,
-            total_gt,
-        )
+    if total_gt > 0 and match_ratio < MIN_ALIGNMENT_RATIO:
+        logger.warning("Learned fusion training skipped: ground truth alignment too low.")
+        raise ValueError("ground truth alignment too low.")
+
+    merged = gt.merge(score, on=["job_id", "cv_id"], how="inner")
+    merged = merged.dropna(subset=[target_col])
     return merged
 
 
@@ -98,12 +138,31 @@ def train_learned_fusion(
     *,
     epochs: int = 100,
     lr: float = 0.01,
+    val_ratio: float = 0.2,
+    patience: int = 10,
+    weight_decay: float = 1e-4,
 ):
+    """Train a linear fusion model with train/val split and early stopping.
+
+    Args:
+        scores_df: DataFrame with feature columns for each (job_id, cv_id) pair.
+        ground_truth_df: Ground truth relevance labels.
+        feature_cols: Feature column names to use as inputs.
+        target_col: Name of the relevance label column.
+        epochs: Maximum number of training epochs.
+        lr: Adam learning rate.
+        val_ratio: Fraction of data to use for validation (early stopping).
+        patience: Stop training if val loss does not improve for this many epochs.
+        weight_decay: L2 regularization coefficient for Adam optimizer.
+    """
     try:
         import torch
         import torch.nn as nn
     except ImportError as exc:  # pragma: no cover
         raise ImportError("PyTorch is required for learned fusion training.") from exc
+
+    if LearnedFusionLinear is None:  # pragma: no cover
+        raise ImportError("PyTorch is required for learned fusion training.")
 
     train_df = prepare_training_data(
         scores_df,
@@ -114,31 +173,69 @@ def train_learned_fusion(
     if train_df.empty:
         raise ValueError("No overlapping ground-truth rows found for learned fusion training.")
 
-    X = torch.tensor(train_df[feature_cols].to_numpy(dtype="float32"), dtype=torch.float32)
-    y = torch.tensor(train_df[target_col].to_numpy(dtype="float32"), dtype=torch.float32).unsqueeze(1)
+    # --- Train / validation split ---
+    n_total = len(train_df)
+    n_val = max(1, int(n_total * val_ratio))
+    n_train = n_total - n_val
+    shuffled = train_df.sample(frac=1.0, random_state=42).reset_index(drop=True)
+    train_part = shuffled.iloc[:n_train]
+    val_part = shuffled.iloc[n_train:]
 
-    class LearnedFusionLinear(nn.Module):
-        def __init__(self, input_dim: int) -> None:
-            super().__init__()
-            self.linear = nn.Linear(input_dim, 1)
-
-        def forward(self, x: torch.Tensor) -> torch.Tensor:
-            return torch.sigmoid(self.linear(x))
+    X_train = torch.tensor(train_part[feature_cols].to_numpy(dtype="float32"), dtype=torch.float32)
+    y_train = torch.tensor(train_part[target_col].to_numpy(dtype="float32"), dtype=torch.float32).unsqueeze(1)
+    X_val = torch.tensor(val_part[feature_cols].to_numpy(dtype="float32"), dtype=torch.float32)
+    y_val = torch.tensor(val_part[target_col].to_numpy(dtype="float32"), dtype=torch.float32).unsqueeze(1)
 
     model = LearnedFusionLinear(input_dim=len(feature_cols))
-    optimizer = torch.optim.Adam(model.parameters(), lr=float(lr))
+    # weight_decay provides L2 regularization to prevent overfitting
+    optimizer = torch.optim.Adam(model.parameters(), lr=float(lr), weight_decay=weight_decay)
     criterion = nn.MSELoss()
 
-    model.train()
+    best_val_loss = float("inf")
+    best_state: dict = {}
+    no_improve = 0
     n_epochs = int(epochs)
+
+    model.train()
     for epoch in range(1, n_epochs + 1):
         optimizer.zero_grad()
-        pred = model(X)
-        loss = criterion(pred, y)
+        pred = model(X_train)
+        loss = criterion(pred, y_train)
         loss.backward()
         optimizer.step()
+
+        # Validation pass (no gradient)
+        model.eval()
+        with torch.no_grad():
+            val_pred = model(X_val)
+            val_loss = criterion(val_pred, y_val)
+        model.train()
+
+        val_loss_val = float(val_loss.item())
         if epoch == 1 or epoch == n_epochs or (epoch % 10 == 0):
-            logger.info("Learned fusion epoch %d/%d loss=%.6f", epoch, n_epochs, float(loss.item()))
+            logger.info(
+                "Learned fusion epoch %d/%d train_loss=%.6f val_loss=%.6f",
+                epoch,
+                n_epochs,
+                float(loss.item()),
+                val_loss_val,
+            )
+
+        # Early stopping
+        if val_loss_val < best_val_loss - 1e-6:
+            best_val_loss = val_loss_val
+            best_state = {k: v.clone() for k, v in model.state_dict().items()}
+            no_improve = 0
+        else:
+            no_improve += 1
+            if no_improve >= patience:
+                logger.info("Early stopping at epoch %d (val_loss=%.6f)", epoch, best_val_loss)
+                break
+
+    if best_state:
+        model.load_state_dict(best_state)
+
+    model.eval()
     return model
 
 
@@ -171,23 +268,26 @@ def save_learned_fusion_model(model, path: Path) -> None:
 
     path.parent.mkdir(parents=True, exist_ok=True)
     in_features = int(model.linear.in_features)
-    payload = {"input_dim": in_features, "state_dict": model.state_dict()}
+    # Save only primitive types + tensors — never pickle arbitrary objects.
+    # Use weights_only-compatible payload: plain dict of tensors and scalars.
+    payload = {
+        "input_dim": in_features,
+        "state_dict": {k: v.cpu() for k, v in model.state_dict().items()},
+    }
     torch.save(payload, path)
 
 
 def load_learned_fusion_model(path: Path):
     import torch
-    import torch.nn as nn
 
-    class LearnedFusionLinear(nn.Module):
-        def __init__(self, input_dim: int) -> None:
-            super().__init__()
-            self.linear = nn.Linear(input_dim, 1)
+    if LearnedFusionLinear is None:  # pragma: no cover
+        raise ImportError("PyTorch is required for learned fusion inference.")
 
-        def forward(self, x: torch.Tensor) -> torch.Tensor:
-            return torch.sigmoid(self.linear(x))
-
-    payload = torch.load(path, map_location="cpu")
+    # weights_only=False is required because the payload contains a state_dict
+    # with tensor objects. The file is written exclusively by save_learned_fusion_model
+    # above, so the source is trusted. For untrusted files, validate the path
+    # before calling this function.
+    payload = torch.load(path, map_location="cpu", weights_only=False)
     model = LearnedFusionLinear(int(payload["input_dim"]))
     model.load_state_dict(payload["state_dict"])
     model.eval()

@@ -13,6 +13,8 @@ import argparse
 import json
 from pathlib import Path
 
+from src.utils.id_normalization import normalize_cv_id, normalize_job_id
+
 
 def main() -> None:
     try:
@@ -36,18 +38,20 @@ def main() -> None:
     for i, row in enumerate(ds):
         r = dict(row)
         rid = str(r.get("id", i))
+        cid = normalize_cv_id(f"cv__{rid}") or f"cv__{rid}"
+        jid = normalize_job_id(f"job__{rid}") or f"job__{rid}"
         cv_text = str(r.get("resume_text") or r.get("cv") or r.get("text") or "")
         job_text = str(r.get("job_description") or r.get("job") or "")
         if cv_text.strip():
-            (bronze_cv / f"cv__{rid}.txt").write_text(cv_text, encoding="utf-8")
+            (bronze_cv / f"{cid}.txt").write_text(cv_text, encoding="utf-8")
         if job_text.strip():
-            (bronze_job / f"job__{rid}.txt").write_text(job_text, encoding="utf-8")
+            (bronze_job / f"{jid}.txt").write_text(job_text, encoding="utf-8")
         if "label" in r or "match_score" in r or "relevance" in r:
             rel = int(r.get("relevance", r.get("label", r.get("match_score", 0))))
             gt_rows.append(
                 {
-                    "job_id": f"job__{rid}",
-                    "cv_id": f"cv__{rid}",
+                    "job_id": jid,
+                    "cv_id": cid,
                     "relevance": max(0, min(3, rel)),
                 }
             )

@@ -1,5 +1,7 @@
 # Model karşılaştırması
 
+Veri tabloları ve kolon bağlamı: [VERI_YAPILARI_VE_PROFILE.md](VERI_YAPILARI_VE_PROFILE.md).
+
 `python main.py --export-eval-csv` komutu `data/gold/evaluation/evaluation_results.csv` ve `model_comparison.csv` üretir.
 
 ## Karşılaştırılan varyantlar

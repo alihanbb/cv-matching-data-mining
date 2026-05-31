@@ -221,7 +221,10 @@ def evaluate_models(
         )
         return pd.DataFrame(), pd.DataFrame()
     gt = validate_ground_truth_df(pd.read_csv(gt_path))
-    top_k = int(cfg.get("matching", {}).get("top_k", 10))
+    # eval_top_k: evaluation uses a larger pool than the pipeline output top_k.
+    # This ensures ground-truth CVs ranked 11-50 are still reachable for metrics.
+    matching_top_k = int(cfg.get("matching", {}).get("top_k", 10))
+    top_k = int(cfg.get("evaluation", {}).get("eval_top_k", max(matching_top_k, 50)))
     ks = [int(k) for k in cfg.get("evaluation", {}).get("top_k_values", [1, 3, 5])]
 
     m_base = build_matching_matrices(root, cfg, semantic=False, bm25=False)

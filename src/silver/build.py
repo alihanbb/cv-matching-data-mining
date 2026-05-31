@@ -86,6 +86,13 @@ def _cv_bundles(
     years = float(cv_total_years_estimate(sig))
     q = cv_quality_score(sections, anon_text)
 
+    labs = row.get("labels")
+    gold_ents: list[Any] = []
+    if isinstance(labs, dict):
+        ge = labs.get("entities")
+        if isinstance(ge, list):
+            gold_ents = [e for e in ge if isinstance(e, dict)]
+
     unified = {
         "record_id": cid,
         "cv_id": cid,
@@ -99,6 +106,8 @@ def _cv_bundles(
         "total_years_experience": years,
         "cv_quality_score": q,
     }
+    if gold_ents:
+        unified["gold_ner_entities"] = gold_ents
     profile = {
         "cv_id": cid,
         "source": src,
@@ -111,6 +120,8 @@ def _cv_bundles(
         "section_lengths": {k: len(v or "") for k, v in sections.items()},
         "silver_layer": "resume_profile_v1",
     }
+    if gold_ents:
+        profile["gold_ner_entity_count"] = len(gold_ents)
     return unified, profile
 
 

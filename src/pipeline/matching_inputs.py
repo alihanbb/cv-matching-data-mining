@@ -76,6 +76,10 @@ class MatchingMatrices:
     cvs_df: pd.DataFrame = field(default_factory=pd.DataFrame)
     jobs_df: pd.DataFrame = field(default_factory=pd.DataFrame)
 
+    # TF-IDF builder — already fit; used by orchestrator to persist model
+    # without a second (redundant) fit pass.
+    tfidf_builder: "TfidfFeatureBuilder | None" = field(default=None)
+
     # ------------------------------------------------------------------
     # Flags
     # ------------------------------------------------------------------
@@ -253,6 +257,7 @@ def build_matching_matrices(
         jobs_df=jobs,
         dense_enabled=dense_enabled,
         bm25_enabled=bm25_enabled,
+        tfidf_builder=builder,
     )
 
 

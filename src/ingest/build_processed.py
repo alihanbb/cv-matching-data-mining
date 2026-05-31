@@ -9,7 +9,13 @@ import pandas as pd
 from src.schemas.documents import CleanDocument
 from src.utils.id_normalization import normalize_cv_id, normalize_job_id
 
-from .bronze_jsonl_io import bronze_jobs_path, bronze_resumes_path, iter_jsonl_objects
+from .bronze_jsonl_io import (
+    bronze_jobs_path,
+    bronze_ner_annotations_path,
+    bronze_resumes_path,
+    iter_jsonl_objects,
+)
+from .ner_bronze_merge import load_ner_entities_by_resume_id, merge_ner_labels_into_profile_rows
 from .text_extract import extract_text_from_path
 
 logger = logging.getLogger(__name__)
@@ -48,6 +54,13 @@ def _bronze_resume_row(obj: dict[str, Any], cleaner, src_default: str) -> dict[s
         return None
     src = str(obj.get("source", "")).strip() or src_default
     cleaned_text = cleaner.clean(raw_text)
+    labels_raw = obj.get("labels")
+    if isinstance(labels_raw, dict):
+        labels_out = {k: v for k, v in labels_raw.items()}
+        if "entities" not in labels_out:
+            labels_out["entities"] = []
+    else:
+        labels_out = {"entities": []}
     return {
         "cv_id": rid,
         "source": src,
@@ -55,6 +68,7 @@ def _bronze_resume_row(obj: dict[str, Any], cleaner, src_default: str) -> dict[s
         "raw_text": raw_text,
         "cleaned_text": cleaned_text,
         "text": cleaned_text,
+        "labels": labels_out,
     }
 
 
@@ -161,6 +175,7 @@ def build_processed_from_raw(
                 "raw_text": text,
                 "cleaned_text": cleaned_text,
                 "text": cleaned_text,
+                "labels": {"entities": []},
             }
             bronze_profile_rows.append(row)
             if _passes_ranking_filter(row["source"], ranking_sources):
@@ -209,6 +224,7 @@ def build_processed_from_raw(
                 "raw_text": txt,
                 "cleaned_text": cleaned_txt,
                 "text": cleaned_txt,
+                "labels": {"entities": []},
             }
             bronze_profile_rows.append(nrow)
             if cid not in ranking_final:
@@ -224,6 +240,14 @@ def build_processed_from_raw(
 
         for r in ner_profile_extensions_from_jsonl(root, ing):
             bronze_profile_rows.append(r)
+
+    if root is not None and bool(ing.get("merge_bronze_ner_annotations", True)):
+        ner_p = bronze_ner_annotations_path(root, ing)
+        if ner_p.is_file():
+            ner_idx = load_ner_entities_by_resume_id(ner_p)
+            n_merged = merge_ner_labels_into_profile_rows(bronze_profile_rows, ner_idx)
+            if n_merged:
+                logger.info("Merged Bronze NER annotations into %d profile rows", n_merged)
 
     if short_extra_rank:
         logger.info(

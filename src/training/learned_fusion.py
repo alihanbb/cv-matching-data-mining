@@ -14,6 +14,8 @@ from src.utils.helpers import resolve_path
 
 logger = logging.getLogger(__name__)
 
+MIN_ALIGNMENT_RATIO = 0.5
+
 
 def train_learned_fusion(
     root: Path,
@@ -64,6 +66,22 @@ def train_learned_fusion(
         ]
         xs.append(feat)
         ys.append(float(r["relevant"]) / 3.0)
+
+    total_gt = int(len(gt))
+    matched_gt = int(len(xs))
+    unmatched_gt = total_gt - matched_gt
+    match_ratio = (matched_gt / total_gt) if total_gt else 0.0
+    logger.info(
+        "Learned fusion training alignment: total_ground_truth_rows=%d matched_ground_truth_rows=%d "
+        "unmatched_ground_truth_rows=%d match_ratio=%.4f",
+        total_gt,
+        matched_gt,
+        unmatched_gt,
+        match_ratio,
+    )
+    if total_gt > 0 and match_ratio < MIN_ALIGNMENT_RATIO:
+        logger.warning("Learned fusion training skipped: ground truth alignment too low.")
+        raise ValueError("ground truth alignment too low.")
 
     if len(xs) < 3:
         raise ValueError(

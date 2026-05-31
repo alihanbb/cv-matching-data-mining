@@ -7,10 +7,16 @@ import pandas as pd
 from src.utils.candidate_dedup import dedupe_candidates_by_canonical_cv_id, resolve_score_column
 from src.utils.id_normalization import normalize_cv_id, normalize_job_id
 
+# Keep in sync with ``ingest.ranking_sources`` in config/config.yaml (dashboard + pipeline).
 RANKING_SOURCE_TAGS: tuple[str, ...] = (
     "vacancy_resume_matching",
     "sample",
     "huggingface_cv_matcher",
+    "dataturks_resume_ner_train",
+    "dataturks_resume_ner_test",
+    "mehyar_ner_annotated_cv",
+    "nlp_ner_on_resume_json_demo",
+    "cv_analysis_pdf_corpus",
 )
 
 NER_SOURCE_TAGS: tuple[str, ...] = (

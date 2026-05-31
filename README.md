@@ -34,7 +34,8 @@ KDD (Knowledge Discovery in Databases) sürecine birebir oturur:
 6. **Modelleme** — Top-K sıralama + açıklama üretimi.
 7. **Değerlendirme** — Precision@K / NDCG@K / MRR / MAP.
 
-Detay: [docs/RAPOR.md](docs/RAPOR.md), diyagram: [docs/PIPELINE_DIAGRAM.md](docs/PIPELINE_DIAGRAM.md).
+Diyagram: [docs/PIPELINE_DIAGRAM.md](docs/PIPELINE_DIAGRAM.md). Veri şeması ve profil:
+[docs/VERI_YAPILARI_VE_PROFILE.md](docs/VERI_YAPILARI_VE_PROFILE.md).
 
 ---
 
@@ -56,7 +57,7 @@ Detay: [docs/RAPOR.md](docs/RAPOR.md), diyagram: [docs/PIPELINE_DIAGRAM.md](docs
 
 **Fallback** (yüksekteki JSONL yoksa): `data/bronze/cvs/`, `data/bronze/job_descriptions/` altındaki PDF / DOCX / TXT / MD.
 
-**Önemli:** `main.py` eşleştirme kodu **dış repo klasörlerini doğrudan okumaz**. Dış veriler `scripts/import_external_repos_to_bronze.py` ile Bronze JSONL’ye alınır; pipeline yalnızca Bronze→Silver→Gold katmanından beslenir.
+**Önemli:** `main.py` eşleştirme kodu **dış repo klasörlerini** ve **`cv_analysis/data/data` PDF ağacını** doğrudan okumaz. Dış veriler `scripts/import_external_repos_to_bronze.py`; kategori klasörlü yerel PDF’ler `scripts/import_cv_analysis_data_to_bronze.py` ile Bronze JSONL’ye alınır — pipeline yalnızca Bronze→Silver→Gold katmanından beslenir.
 
 | Katman        | Tipik çıktı yolları                                                                                                                                       |
 | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -77,9 +78,11 @@ Bu proje **dış veri klasörlerini bağımlılık olarak sürekli taşımaz**. 
 | Entity-Recognition-In-Resumes-SpaCy | Train/test → `resumes`, `ner_annotations`           |
 | vacancy-resume-matching-dataset     | DOCX CV’ler ve ilan CSV → resumes, jobs, GT şablonu |
 | NER-Annotated-CVs                   | Annotated JSON → resumes, ner_annotations           |
+| `cv_analysis/data/data/<Kategori>/` | PDF/DOCX (yerel) → `import_cv_analysis_data_to_bronze.py` → `resumes_bronze.jsonl` |
 
 ```bash
 python scripts/import_external_repos_to_bronze.py --source-root .. --all --overwrite
+python scripts/import_cv_analysis_data_to_bronze.py --overwrite
 ```
 
 Ardından (dış klasörleri silebilirsiniz):
@@ -204,7 +207,7 @@ Açıklanabilir CSV’de görünür diğer kolon örnekleri: `source`, `skill_ja
 ## PII and silver JSONL
 
 - `privacy.anonymize: true` (varsayılan): e-posta / URL / telefon benzeri desenler skorlamadan önce maskelenir.
-- `silver.write_unified_resumes: true` → `data/silver/unified_resumes.jsonl` (bölümler, skill’ler, `cv_quality_score`).
+- `silver.write_unified_resumes: true` (isteğe bağlı) ingest sırasında `data/silver/unified_resumes.jsonl` yazar — bölümler, skill’ler, `cv_quality_score`. Varsayılan yapılandırmada genelde kapalıdır; dosya daha önceki koşumlardan kalabilir.
 
 ---
 
@@ -219,7 +222,7 @@ pip install -e ".[kaggle_import]"  # Kaggle CLI
 
 Scriptler: `scripts/import_hf_cv_matcher.py`, `scripts/import_vacancy_resume_dataset.py`, `scripts/import_kaggle_resume_dataset.py`
 
-Ayrıntı: [docs/DATASETS.md](docs/DATASETS.md)
+Ayrıntı: [docs/DATASETS.md](docs/DATASETS.md) · şema ve profil: [docs/VERI_YAPILARI_VE_PROFILE.md](docs/VERI_YAPILARI_VE_PROFILE.md)
 
 ---
 
@@ -338,8 +341,9 @@ cv-matching-data-mining/
 │   ├── gold/                   # Model + sıralama çıktıları
 │   └── evaluation/             # ground_truth.csv
 ├── docs/
-│   ├── RAPOR.md
 │   ├── PIPELINE_DIAGRAM.md
+│   ├── VERI_YAPILARI_VE_PROFILE.md
+│   ├── DATASETS.md
 │   ├── KVKK_VE_GUVENLIK.md
 │   └── ...
 ├── src/
@@ -371,18 +375,14 @@ GitHub Actions: `.github/workflows/ci.yml` (`pytest` + `python main.py --no-sema
 
 ## Documentation map
 
-| Belge                                                                                                | Açıklama                             |
-| ---------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| [docs/RAPOR.md](docs/RAPOR.md)                                                                       | KDD hizalı veri madenciliği raporu   |
-| [docs/PIPELINE_DIAGRAM.md](docs/PIPELINE_DIAGRAM.md)                                                 | Mermaid pipeline diyagramı           |
-| [docs/KVKK_VE_GUVENLIK.md](docs/KVKK_VE_GUVENLIK.md)                                                 | Kişisel veri ve anonimleştirme       |
-| [docs/GROUND_TRUTH_GUIDE.md](docs/GROUND_TRUTH_GUIDE.md)                                             | Etiket dosyası şeması                |
-| [docs/MODEL_COMPARISON.md](docs/MODEL_COMPARISON.md)                                                 | Model karşılaştırma çıktıları        |
-| [docs/DATASETS.md](docs/DATASETS.md)                                                                 | Harici veri setleri ve Bronze import |
-| [docs/PROJE_KAVRAMSAL_REHBER.md](docs/PROJE_KAVRAMSAL_REHBER.md)                                     | Kavramsal rehber                     |
-| [docs/CALISTIRMA_ORTAMI_VE_GELISTIRME_YONETIMI.md](docs/CALISTIRMA_ORTAMI_VE_GELISTIRME_YONETIMI.md) | Operasyon ve geliştirme yönetimi     |
-| [docs/MEVCUT_DURUM_VE_MIMARI.md](docs/MEVCUT_DURUM_VE_MIMARI.md)                                     | Güncel durum ve mimari               |
-| [docs/YOL_HARITASI.md](docs/YOL_HARITASI.md)                                                         | Yol haritası                         |
+| Belge                                                                                                | Açıklama                                        |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| [docs/VERI_YAPILARI_VE_PROFILE.md](docs/VERI_YAPILARI_VE_PROFILE.md)                                 | Bronze/Silver/Gold şema, içerik, örnek boyutlar |
+| [docs/PIPELINE_DIAGRAM.md](docs/PIPELINE_DIAGRAM.md)                                                  | Mermaid pipeline diyagramı ve komut özeti       |
+| [docs/KVKK_VE_GUVENLIK.md](docs/KVKK_VE_GUVENLIK.md)                                                 | Kişisel veri ve anonimleştirme                 |
+| [docs/GROUND_TRUTH_GUIDE.md](docs/GROUND_TRUTH_GUIDE.md)                                             | Etiket dosyası şeması                           |
+| [docs/MODEL_COMPARISON.md](docs/MODEL_COMPARISON.md)                                                 | Model karşılaştırma çıktıları                   |
+| [docs/DATASETS.md](docs/DATASETS.md)                                                                  | Harici veri kaynakları ve import komutları       |
 
 ---
 
