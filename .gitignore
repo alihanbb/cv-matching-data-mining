@@ -3,6 +3,8 @@ data/bronze/
 data/silver/
 data/gold/
 data/external/
+data/evaluation/unmatched_ground_truth_examples.csv
+data/evaluation/stage_vanetik_bronze.json
 
 # Binary or archive inputs
 *.docx
@@ -17,8 +19,10 @@ __pycache__/
 .pytest_cache/
 .ipynb_checkpoints/
 
-# Run manifests
+# Run manifests and model artifacts
 artifacts/runs/
+artifacts/models/
+artifacts/best_fusion_weights.json
 
 # Virtual environments and builds
 .ruff_cache/

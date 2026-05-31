@@ -1,21 +1,13 @@
-#!/usr/bin/env python3
-"""Debug alignment between evaluation ground truth and explained candidate scores."""
+"""Alignment utilities for ground truth vs candidate score evaluation."""
 
 from __future__ import annotations
 
-import argparse
-import json
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
 from src.utils.id_normalization import normalize_cv_id, normalize_job_id
-
-
-def _resolve(path_like: str, root: Path) -> Path:
-    p = Path(path_like)
-    return p if p.is_absolute() else (root / p)
 
 
 def _sample(values: pd.Series, n: int = 10) -> list[str]:
@@ -28,12 +20,18 @@ def build_alignment_report(
     scores_path: Path,
     unmatched_out: Path,
 ) -> dict[str, Any]:
+    """Compare ground truth CV/job pairs against pipeline score pairs.
+
+    Returns a dict with match counts and ratio; writes unmatched rows to
+    *unmatched_out* as a CSV.
+    """
     gt = pd.read_csv(ground_truth_path)
     scores = pd.read_csv(scores_path)
 
     if "cv_id" not in gt.columns and "resume_id" in gt.columns:
         gt = gt.copy()
         gt["cv_id"] = gt["resume_id"]
+
     required_gt = {"job_id", "cv_id"}
     missing_gt = required_gt - set(gt.columns)
     if missing_gt:
@@ -99,35 +97,3 @@ def build_alignment_report(
         "sample_score_cv_ids": _sample(scores["cv_id_norm"]),
         "unmatched_ground_truth_examples_csv": str(unmatched_out),
     }
-
-
-def main() -> None:
-    root = Path(__file__).resolve().parents[1]
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument(
-        "--ground-truth",
-        default="data/evaluation/ground_truth.csv",
-        help="Ground-truth CSV path.",
-    )
-    ap.add_argument(
-        "--scores",
-        default="data/gold/rankings/candidate_scores_explained.csv",
-        help="Candidate scores explained CSV path.",
-    )
-    ap.add_argument(
-        "--unmatched-out",
-        default="data/evaluation/unmatched_ground_truth_examples.csv",
-        help="Output CSV path for unmatched ground-truth rows.",
-    )
-    args = ap.parse_args()
-
-    report = build_alignment_report(
-        _resolve(args.ground_truth, root),
-        _resolve(args.scores, root),
-        _resolve(args.unmatched_out, root),
-    )
-    print(json.dumps(report, ensure_ascii=False, indent=2))
-
-
-if __name__ == "__main__":
-    main()

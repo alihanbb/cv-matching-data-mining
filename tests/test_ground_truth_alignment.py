@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from scripts.debug_ground_truth_alignment import build_alignment_report
+from src.evaluation.alignment import build_alignment_report
 from src.utils.id_normalization import normalize_cv_id, normalize_job_id
 
 
